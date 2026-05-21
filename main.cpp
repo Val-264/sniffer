@@ -122,11 +122,17 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
 
 }
 
+void captura_de_paquetes() {
+ if (pcap_loop(capdev, 0, call_me, (u_char *)NULL) < 0) {
+        cerr << "ERR: pcap_loop() fallo: " << pcap_geterr(capdev) << "\n";
+    }
+}
+
 int main(int argc, char const *argv[]) {
     // Inicializar Winsock (Esencial en Windows)
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        cerr << "ERR: WSAStartup falló.\n";
+        cerr << "ERR: WSAStartup fallo.\n";
         return 1;
     }
 
@@ -149,32 +155,32 @@ int main(int argc, char const *argv[]) {
         return 1;
     }
 
-    // MENÚ DE SELECCIÓN DE INTERFAZ
+    // Menú de selección de interfaz 
     int i = 0;
     pcap_if_t *d;
     cout << "=== INTERFACES DISPONIBLES ===\n";
     for (d = alldevs; d != nullptr; d = d->next) {
         cout << ++i << ". " << d->name << "\n";
         if (d->description) {
-            cout << "   Descripción: " << d->description << "\n";
+            cout << "   Descripcion: " << d->description << "\n";
         } else {
-            cout << "   Descripción: No disponible\n";
+            cout << "   Descripcion: No disponible\n";
         }
     }
 
     if (i == 0) {
-        cout << "No se encontraron interfaces válidas.\n";
+        cout << "No se encontraron interfaces validas.\n";
         pcap_freealldevs(alldevs);
         WSACleanup();
         return 1;
     }
 
     int opcion;
-    cout << "\nSelecciona el número de interfaz activa (ej. la que diga Wireshark, Intel, Realtek o Wi-Fi): ";
+    cout << "\nSelecciona el numero de interfaz activa (ej. la que diga Wireshark, Intel, Realtek o Wi-Fi): ";
     cin >> opcion;
 
     if (opcion < 1 || opcion > i) {
-        cout << "Opción inválida.\n";
+        cout << "Opcion invalida.\n";
         pcap_freealldevs(alldevs);
         WSACleanup();
         return 1;
@@ -187,10 +193,11 @@ int main(int argc, char const *argv[]) {
     }
 
     cout << "\nAbriendo interfaz: " << (device->description ? device->description : device->name) << "\n";
-    // ---------------------------------------------
 
-    // Abrir sesión de captura (El resto de tu pcap_open_live sigue igual debajo...)
-    pcap_t *capdev = pcap_open_live(device->name, BUFSIZ, 1, 1000, error_buffer);
+
+    // Abrir sesión de captura 
+    capdev = pcap_open_live(device->name, BUFSIZ, 1, 1000, error_buffer);
+    
     if (capdev == NULL) {
         cerr << "ERR: pcap_open_live() " << error_buffer << "\n";
         pcap_freealldevs(alldevs);
@@ -221,14 +228,35 @@ int main(int argc, char const *argv[]) {
         }
     }
 
-    // Iniciar bucle de escucha
-    cout << "\n--- ESCUCHANDO RED --- Envíe tráfico (abra el navegador o haga un ping)...\n\n";
+    // Iniciar de multihilo y escucha
+    cout << "\n--- ESCUCHANDO RED --- Envie trafico (abra el navegador o haga un ping)...\n\n";
+    cout << "Presiona Enter si quieres detener al captura";
+
     int col =20;
-      cout << "ID" << setw(col) << "PROTOCOLO" << setw(col) << "IP ORIGEN" << setw(col) 
-  << "PUERTO DE ORIGEN " << setw(col) << "IP DESTINO" << setw(col) << "PUERTO DESTINO"
-  << setw(col) << "LONGITUD PAQUETE\n";
-    if (pcap_loop(capdev, packets_count, call_me, (u_char *)NULL) < 0) {
-        cerr << "ERR: pcap_loop() falló: " << pcap_geterr(capdev) << "\n";
+    cout << "ID" << setw(col) << "PROTOCOLO" << setw(col) << "IP ORIGEN" << setw(col) 
+    << "PUERTO DE ORIGEN " << setw(col) << "IP DESTINO" << setw(col) << "PUERTO DESTINO"
+    << setw(col) << "LONGITUD PAQUETE\n";
+   
+    capturando = true;
+
+    // Iniciar hilo para la captura de paquetes 
+    thread hilo_de_captura(captura_de_paquetes);
+    
+    cin.ignore(); // Limpiar buffer 
+    cin.get();    // Esperar a capturar Enter 
+
+    // Si el se presiona Enter 
+    if (capturando) {
+        cout << "\nFin de la captura de paquetes";
+
+        pcap_breakloop(capdev); // Función de npcap para detener la captura
+
+        // Esperar a que el hilo de captura termine 
+        if (hilo_de_captura.joinable()) {
+            hilo_de_captura.join(); // Unir el hilo de captura con el hilo principal 
+        }
+
+        capturando = false;
     }
 
     // Verificación final del almacenamiento en memoria
@@ -238,6 +266,6 @@ int main(int argc, char const *argv[]) {
     cout << "========================================================================\n";
 
     pcap_close(capdev);
-    WSACleanup();
+    WSACleanup();      // Terminar el uso de ws2tcpip.h
     return 0;
 }
