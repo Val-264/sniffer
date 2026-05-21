@@ -8,6 +8,9 @@
 #include <memory> // para evitar fugas de memoria
 #include <ws2tcpip.h> 
 #include <iomanip> // Para impresión uniforme de columnas 
+// Para manejo de hilos 
+#include <thread> // Para uso de hilos 
+#include <atomic> // Para gesionar la concurrencia y la ejecución entre múltiples hilos en ejecución 
 using namespace std;
 
 struct Datos_Paquete {
@@ -163,5 +166,8 @@ struct dhcp_header {
 vector<Datos_Paquete> paquetes_capturados;
 inline int id_paquete = 1;
 inline int longitud_encabezado_de_red = 0;  // Longitud de los datos de la capa de enlace 
+
+inline pcap_t *capdev = nullptr;
+inline atomic<bool> capturando(false);
 
 #endif
