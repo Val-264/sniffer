@@ -3,9 +3,11 @@
 #include <iostream>
 #include <pcap.h>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <memory> // para evitar fugas de memoria
 #include <ws2tcpip.h> 
+#include <iomanip> // Para impresión uniforme de columnas 
 using namespace std;
 
 struct Datos_Paquete {
