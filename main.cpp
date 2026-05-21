@@ -1,38 +1,4 @@
-#include <iostream>
-#include <pcap.h>
-#include <string>
-#include <vector>
-#include <memory> // para evitar fugas de memoria
-#include <ws2tcpip.h> 
-using namespace std;
-
-struct Datos_Paquete {
-  int id; 
-  int longitud_paquete;
-  string src_ip;
-  string dest_ip;
-  string protocol; 
-
-  int src_port = 0;
-  int dest_port = 0;
-
-  string extra_info;
-
-  vector<unsigned char> raw_data;
-};
-
-struct ip_header {
-  unsigned char ip_vhl;
-  unsigned char ip_tos;
-  struct in_addr ip_src;  // IP origen 
-  struct in_addr ip_dst;  // IP destino 
-  unsigned char ip_p;
-};
-
-// Almacenamiento global de paquetes capturados
-vector<Datos_Paquete> paquetes_capturados;
-int id_paquete = 1;
-int longitud_encabezado_de_red = 0;  // Longitud de los datos de la capa de enlace 
+#include "estructuras.h"
 
 /*
 * @param user        Último argumento pasado a pcap_loop
@@ -65,25 +31,21 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
   
 
   // Protocolos de la capa de red 
-  struct icmp_hdr *icmp_hdr;
+  icmp_header *icmp_hdr;
 
   // Protocolos de la capa de transporte
-  struct tcp_header *tcp_hdr;
-  struct udp_header *udp_hdr;
+  tcp_header *tcp_hdr;
+  udp_header *udp_hdr;
 
   // Protcolos de la capa de aplicación 
-  struct telnet_header *telnet_hdr;
-  struct ssh_header *ssh_hdr;
-  struct ftp_header *ftp_hdr;
-  struct sftp_header *sftp_hdr;
-  struct dns_header *dns_hdr;
-  struct dhcp_header *dhcp_hdr;
+  dns_header *dns_hdr;
+  dhcp_header *dhcp_hdr;
 
   switch (ip_hdr->ip_p) {
     case IPPROTO_TCP:
       tcp_hdr = (struct tcp_header *)ptr_a_transporte;
       record.protocol = "TCP";
-      record.src_port = ntohs(tcp_hdr->th_port);
+      record.src_port = ntohs(tcp_hdr->th_sport);
       record.dest_port = ntohs(tcp_hdr->th_dport);
       break;
     case IPPROTO_TCP:
@@ -96,6 +58,8 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
   }
 
 }
+
+
 
 int main() {
 
