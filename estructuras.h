@@ -164,10 +164,10 @@ struct dhcp_header {
 // ==========================================
 // Almacenamiento global de paquetes capturados
 vector<Datos_Paquete> paquetes_capturados;
-inline int id_paquete = 1;
-inline int longitud_encabezado_de_red = 0;  // Longitud de los datos de la capa de enlace 
+int id_paquete = 1;
+int longitud_encabezado_de_red = 0;  // Longitud de los datos de la capa de enlace 
 
-inline pcap_t *capdev = nullptr;
-inline atomic<bool> capturando(false);
+pcap_t *capdev = nullptr;
+atomic<bool> capturando(false);
 
 #endif
