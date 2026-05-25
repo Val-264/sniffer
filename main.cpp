@@ -128,6 +128,16 @@ void captura_de_paquetes() {
     }
 }
 
+string filtrar() {
+    string filtro;
+
+    cout << "Filtro: ";
+    cin.ignore();
+    getline(cin, filtro);
+
+    return filtro;
+}
+
 int main(int argc, char const *argv[]) {
     // Inicializar Winsock (Esencial en Windows)
     WSADATA wsaData;
@@ -217,8 +227,9 @@ int main(int argc, char const *argv[]) {
     }
 
     // Filtros BPF 
+    string filtro = filtrar();
     struct bpf_program bpf;
-    const char *filters = "";  // Se deja vacío para que catura ccualquier paquete 
+    const char *filters = "";  // Se deja vacío para que catura cualquier paquete 
 
     if (pcap_compile(capdev, &bpf, filters, 0, 0) == PCAP_ERROR) {
         cerr << "ERR: pcap_compile() " << pcap_geterr(capdev) << "\n";
