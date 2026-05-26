@@ -230,7 +230,7 @@ int main(int argc, char const *argv[]) {
 
     // Iniciar de multihilo y escucha
     cout << "\n--- ESCUCHANDO RED --- Envie trafico (abra el navegador o haga un ping)...\n\n";
-    cout << "Presiona Enter si quieres detener al captura";
+    cout << "Presiona Enter si quieres detener al captura\n\n";
 
     int col =20;
     cout << "ID" << setw(col) << "PROTOCOLO" << setw(col) << "IP ORIGEN" << setw(col) 
