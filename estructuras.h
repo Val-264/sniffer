@@ -11,6 +11,13 @@
 // Para manejo de hilos 
 #include <thread> // Para uso de hilos 
 #include <atomic> // Para gesionar la concurrencia y la ejecución entre múltiples hilos en ejecución 
+
+// Encabezados de la interfaz gráfica y ventanas
+#include <GLFW/glfw3.h>
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
+
 using namespace std;
 
 struct Datos_Paquete {
