@@ -11,6 +11,7 @@
 // Para manejo de hilos 
 #include <thread> // Para uso de hilos 
 #include <atomic> // Para gesionar la concurrencia y la ejecución entre múltiples hilos en ejecución 
+#include <mutex>  // Para proteger el acceso a recursos compartidos (como el vector de paquetes) en un entorno multihilo
 
 // Encabezados de la interfaz gráfica y ventanas
 #include <GLFW/glfw3.h>
@@ -20,15 +21,24 @@
 
 using namespace std;
 
+void dibujarInterfaz();
+void captura_de_paquetes();
+
+// Estructuras para almacenar información de interfaces de red y paquetes capturados
+struct InterfacesDeRed{
+    string nombre_tecnico;
+	string descripcion;
+};
+
 struct Datos_Paquete {
   int id; 
   int longitud_paquete;
-  string src_ip;
-  string dest_ip;
-  string protocol; 
+  string src_ip;        // IP de origen (o MAC para ARP)
+  string dest_ip;       // IP de destino (o MAC para ARP)
+  string protocolo; 
 
-  int src_port = 0;
-  int dest_port = 0;
+  int src_port = 0;     // Puerto de origen (si aplica)
+  int dest_port = 0;    // Puerto de destino (si aplica)
 
   string extra_info;
 
@@ -170,11 +180,14 @@ struct dhcp_header {
 // VARIABLES GLOBALES 
 // ==========================================
 // Almacenamiento global de paquetes capturados
-vector<Datos_Paquete> paquetes_capturados;
-int id_paquete = 1;
-int longitud_encabezado_de_red = 0;  // Longitud de los datos de la capa de enlace 
+extern vector<Datos_Paquete> paquetes_capturados;
+extern int id_paquete;
+extern int longitud_encabezado_de_red;  // Longitud de los datos de la capa de enlace 
+extern vector<InterfacesDeRed> lista_interfaces_de_red; // Almacenamiento global de interfaces de red disponibles
 
-pcap_t *capdev = nullptr;
-atomic<bool> capturando(false);
+extern pcap_t* capdev;
+extern atomic<bool> capturando;
+extern thread hilo_de_captura; // Hilo para la captura de paquetes
+extern mutex mutex_paquetes; // Mutex para proteger el acceso al vector de paquetes capturados en un entorno multihilo
 
 #endif

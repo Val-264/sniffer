@@ -152,6 +152,7 @@
     <ClCompile Include="..\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\main.cpp" />
+    <ClCompile Include="interfaz.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\estructuras.h" />
