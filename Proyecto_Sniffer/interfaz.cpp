@@ -200,7 +200,7 @@ void pantalla_analisis() {
             string nombre_interfaz = lista_interfaces_de_red[interfaz_seleccionada].nombre_tecnico;
             string desc_interfaz = lista_interfaces_de_red[interfaz_seleccionada].descripcion;
             string texto_interfaz = "ID de la interfaz: 0 (" + nombre_interfaz;
-            string tiempo_llegada = "Hora de llegada: "; // @TODO Agregar marca de tiempo real del paquete con pcap_pkthdr->ts
+            string tiempo_llegada = "Hora de llegada: " + paquete_actual.tiempo_llegada; 
             string texto_no_paquete = "No. paquete: " + to_string(indice_paquete_seleccionado + 1);
             string texto_longitud_paquete = "Longitud paquete: " + to_string(paquete_actual.longitud_paquete) + "bytes ("
                 + to_string(tam_bits_cable) + " bits)";

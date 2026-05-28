@@ -26,6 +26,17 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
   // pkthdr->caplen Bytes capturados realmente 
   record.raw_data = vector<unsigned char>(packetd_ptr, packetd_ptr + pkthdr->caplen);
 
+  // Captuar el tiempo de llegada del paquete (marca de tiempo)
+  time_t segundos_totales = pkthdr->ts.tv_sec; 
+  tm info_tiempo;
+  localtime_s(&info_tiempo, &segundos_totales); // Convertir a estructura tm
+
+  char buffer_tiempo[64];
+
+  // Mes, día, año , horas, minutos, segundos
+  strftime(buffer_tiempo, sizeof(buffer_tiempo), "%m %d, %Y  %H:%M:%S.", &info_tiempo);
+  record.tiempo_llegada = buffer_tiempo + to_string(pkthdr->ts.tv_sec);
+
   eth_header *eth_hdr = (struct eth_header *)packetd_ptr;
   unsigned short eth_type = ntohs(eth_hdr->eth_type);
 

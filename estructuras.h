@@ -41,9 +41,11 @@ struct Datos_Paquete {
   int dest_port = 0;    // Puerto de destino (si aplica)
 
   string extra_info;
+  string tiempo_llegada;
 
   vector<unsigned char> raw_data;
 };
+
 
 // ==========================================
 // PROTOCOLOS DE LA CAPA DE ENLACE (Capa 2)
