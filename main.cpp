@@ -30,12 +30,24 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
   time_t segundos_totales = pkthdr->ts.tv_sec; 
   tm info_tiempo;
   localtime_s(&info_tiempo, &segundos_totales); // Convertir a estructura tm
+  long microsegundos = pkthdr->ts.tv_usec; // Obtener microsegundos para mayor precisión
 
   char buffer_tiempo[64];
 
   // Mes, día, año , horas, minutos, segundos
   strftime(buffer_tiempo, sizeof(buffer_tiempo), "%m %d, %Y  %H:%M:%S.", &info_tiempo);
   record.tiempo_llegada = buffer_tiempo + to_string(pkthdr->ts.tv_sec);
+
+  // Tiempo de llegada en formato UTC
+  tm info_tiempo_utc;
+  gmtime_s(&info_tiempo_utc, &segundos_totales); // gmtime_s calcula la hora cero global
+  char buffer_utc[64];
+  strftime(buffer_utc, sizeof(buffer_utc), "%b %d, %Y %H:%M:%S", &info_tiempo_utc);
+  record.tiempo_llegada_utc = string(buffer_utc) + "." + to_string(microsegundos * 1000) + " UTC";
+
+  // Tiempo Epoch (Segundos.Microsegundos)
+  record.tiempo_epoch = to_string(segundos_totales) + "." + to_string(microsegundos * 1000);
+
 
   eth_header *eth_hdr = (struct eth_header *)packetd_ptr;
   unsigned short eth_type = ntohs(eth_hdr->eth_type);
@@ -83,7 +95,10 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
     stringstream ss;
     ss << "Capa 2 Desconocida (0x" << hex << eth_type << dec << ")";
     record.protocolo = ss.str();
-    paquetes_capturados.push_back(record);
+    {
+        lock_guard<mutex> lock(mutex_paquetes);
+        paquetes_capturados.push_back(record);
+    }
     return;
   }
     
@@ -121,13 +136,13 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
       case IPPROTO_ICMP:
           icmp_hdr = (struct icmp_header *)puntero_a_transporte;
           record.protocolo = "ICMPv4";
-          record.extra_info = "Type: " + to_string(icmp_hdr->icmp_type); 
+          record.extra_info = "Tipo: " + to_string(icmp_hdr->icmp_type); 
           break;
 
       case 58:
           icmp_hdr = (struct icmp_header *)puntero_a_transporte;
           record.protocolo = "ICMPv6";
-          record.extra_info = "Type: " + to_string(icmp_hdr->icmp_type); 
+          record.extra_info = "Tipo: " + to_string(icmp_hdr->icmp_type); 
           break;
       default:
           record.protocolo = "Protocolo IP: " + to_string(tipo_de_protocolo);
@@ -138,12 +153,6 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
 	  lock_guard<mutex> lock(mutex_paquetes);
       paquetes_capturados.push_back(record);
   }
-
-  int col = 20;
-
-  cout << "[" << record.id << "] " << setw(col) << record.protocolo << setw(col)
-              << record.src_ip <<  setw(col) << record.src_port << setw(col)  
-              << record.dest_ip << setw(col)  << record.dest_port << setw(col)  << record.longitud_paquete << "\n";
 
 }
 
@@ -190,10 +199,8 @@ int main(int argc, char const *argv[]) {
         return 1;
     }
 
-    // Menú de selección de interfaz 
-    int i = 0;
+    // Buscar interfaces de red activas y almacenarlas en la lista de interfaces de red para mostrarlas en la interfaz gráfica
     pcap_if_t *d;
-    cout << "=== INTERFACES DISPONIBLES ===\n";
     for (d = alldevs; d != nullptr; d = d->next) {
         InterfacesDeRed nuevaInterfaz;
 		nuevaInterfaz.nombre_tecnico = d->name;

@@ -7,7 +7,7 @@
 #include <vector>
 #include <memory> // para evitar fugas de memoria
 #include <ws2tcpip.h> 
-#include <iomanip> // Para impresión uniforme de columnas 
+#include <ctime>   // Para manejo de fechas y horas (marca de tiempo de los paquetes)
 // Para manejo de hilos 
 #include <thread> // Para uso de hilos 
 #include <atomic> // Para gesionar la concurrencia y la ejecución entre múltiples hilos en ejecución 
@@ -41,7 +41,10 @@ struct Datos_Paquete {
   int dest_port = 0;    // Puerto de destino (si aplica)
 
   string extra_info;
+
   string tiempo_llegada;
+  string tiempo_llegada_utc; // Tiempo de llegada en formato UTC
+  string tiempo_epoch; // Tiempo de llegada en formato epoch (segundos desde 1970)
 
   vector<unsigned char> raw_data;
 };

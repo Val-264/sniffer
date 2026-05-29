@@ -56,6 +56,7 @@ void pantalla_interfaz() {
         ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "No se encontraron interfaces activas.");
     }
 }
+
 // =======================================================================================================================================
 //                                                      PANTALLA 2: ANÁLISIS DE TRÁFICO
 // =======================================================================================================================================
@@ -72,7 +73,7 @@ void pantalla_analisis() {
     }
     ImGui::SameLine();
     if (ImGui::Button("Volver a Interfaces")) {
-        // Ocultamor vista de análisis y volver al menu de interfaces 
+        // Ocultar vista de análisis y volver al menu de interfaces 
         if (capturando) {
             // Forzamos detener si aÚn está capturando
             capturando = false;
@@ -81,7 +82,7 @@ void pantalla_analisis() {
             if (capdev != nullptr) { pcap_close(capdev); capdev = nullptr; }
         }
         {
-            lock_guard<mutex> lock(mutex_paquetes); // Aseguramos que no haya acceso concurrente a la lista de paquetes
+            lock_guard<mutex> lock(mutex_paquetes); // Asegurar que no haya acceso concurrente a la lista de paquetes
             paquetes_capturados.clear();
             id_paquete = 0;
         }
@@ -94,10 +95,17 @@ void pantalla_analisis() {
     ImGui::Text(" | Filtro:"); ImGui::SameLine();
     static char filtro_texto[128] = "";
     ImGui::InputText("##Filtro", filtro_texto, IM_ARRAYSIZE(filtro_texto));
+    ImGui::SameLine();
+    if (ImGui::Button("Exportar")) {
+        if (!capturando) {
+
+        }
+    }
+
 
     ImGui::Separator();
 
-    // Calculamos el espacio disponible
+    // Calcular el espacio disponible
     float ancho_total = ImGui::GetContentRegionAvail().x;
     float alto_total = ImGui::GetContentRegionAvail().y;
 
@@ -144,25 +152,26 @@ void pantalla_analisis() {
 
                 // Columna 1: Protocolo
                 ImGui::TableSetColumnIndex(1);
-                ImGui::Text("%s", paquetes_capturados[i].protocolo.c_str());
+                ImGui::TextUnformatted(paquetes_capturados[i].protocolo.c_str());
 
                 // Columna 2: IP Origen
                 ImGui::TableSetColumnIndex(2);
-                ImGui::Text("%s", paquetes_capturados[i].src_ip.c_str());
+                ImGui::TextUnformatted(paquetes_capturados[i].src_ip.c_str());
 
                 // Columna 3: IP Destino
                 ImGui::TableSetColumnIndex(3);
-                ImGui::Text("%s", paquetes_capturados[i].dest_ip.c_str());
+                ImGui::TextUnformatted(paquetes_capturados[i].dest_ip.c_str());
 
                 // Columna 4: Puertos (Origen -> Destino)
                 ImGui::TableSetColumnIndex(4);
                 string puertos = to_string(paquetes_capturados[i].src_port) +
                     " -> " + to_string(paquetes_capturados[i].dest_port);
-                ImGui::Text("%s", puertos.c_str());
+                ImGui::TextUnformatted(puertos.c_str());
 
                 // Columna 5: Longitud
                 ImGui::TableSetColumnIndex(5);
-                ImGui::Text("%d", paquetes_capturados[i].longitud_paquete);
+				string long_paquete = to_string(paquetes_capturados[i].longitud_paquete) + " bytes";
+                ImGui::TextUnformatted(long_paquete.c_str());
             }
         }
         ImGui::EndTable();
@@ -201,6 +210,8 @@ void pantalla_analisis() {
             string desc_interfaz = lista_interfaces_de_red[interfaz_seleccionada].descripcion;
             string texto_interfaz = "ID de la interfaz: 0 (" + nombre_interfaz;
             string tiempo_llegada = "Hora de llegada: " + paquete_actual.tiempo_llegada; 
+			string tiempo_llegada_utc = "Hora de llegada UTC: " + paquete_actual.tiempo_llegada_utc;
+			string tiempo_epoch = "Tiempo de llegada Epoch: " + paquete_actual.tiempo_epoch;
             string texto_no_paquete = "No. paquete: " + to_string(indice_paquete_seleccionado + 1);
             string texto_longitud_paquete = "Longitud paquete: " + to_string(paquete_actual.longitud_paquete) + "bytes ("
                 + to_string(tam_bits_cable) + " bits)";
@@ -216,6 +227,8 @@ void pantalla_analisis() {
                 ImGui::TreePop();
             }
             ImGui::TextUnformatted(tiempo_llegada.c_str());
+			ImGui::TextUnformatted(tiempo_llegada_utc.c_str());
+			ImGui::TextUnformatted(tiempo_epoch.c_str());
             ImGui::TextUnformatted(texto_no_paquete.c_str());
             ImGui::TextUnformatted(texto_longitud_paquete.c_str());
             ImGui::TextUnformatted(texto_longitud_capturada.c_str());
@@ -284,18 +297,105 @@ void pantalla_analisis() {
         }
     }
     else {
-        ImGui::TextDisabled("Seleccione un paquete en la tabla superior...");
+        ImGui::TextDisabled("Esperando selección de un paquete...");
     }
     ImGui::EndChild();
 
 
     ImGui::SameLine(); // Poner el Área 3 justo al lado del Área 2
 
-    // --- ÁREA 3: CONTENIDO RAW (Hexadecimal) ---
-    // Toma el ancho y altura restantes
+    // --- ÁREA 3: CONTENIDO RAW (Hexadecimal y ASCII ) ---
     ImGui::BeginChild("Area3", ImVec2(0, 0), true);
-    ImGui::Text("AREA 3: CONTENIDO RAW DEL PAQUETE");
+    ImGui::TextUnformatted("AREA 3: CONTENIDO RAW DEL PAQUETE");
+    ImGui::Separator();
+
+    if (hay_seleccion && !paquete_actual.raw_data.empty()) {
+
+        static int byte_resaltado = -1;
+        bool algun_hover_este_frame = false;
+
+        float pos_x_inicial = ImGui::GetCursorPosX();
+        float offset_ascii = pos_x_inicial + 380.0f; // Ajustar si las columnas se empalman
+
+        // Llamar a la herramienta de dibujo de ImGui
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+
+        for (size_t i = 0; i < paquete_actual.raw_data.size(); i += 16) {
+            ImGui::Text("%04X  ", (unsigned int)i);
+            ImGui::SameLine(0, 0);
+
+            // --- COLUMNA HEXADECIMAL ---
+            for (size_t j = 0; j < 16; j++) {
+                if (i + j < paquete_actual.raw_data.size()) {
+                    unsigned char byte = paquete_actual.raw_data[i + j];
+
+                    // Guardar las coordenadas de la pantalla para este número
+                    ImVec2 pos_min = ImGui::GetCursorScreenPos();
+                    ImGui::Text("%02X", byte);
+                    ImVec2 pos_max = ImGui::GetItemRectMax();
+
+                    if (ImGui::IsItemHovered()) {
+                        byte_resaltado = (int)(i + j);
+                        algun_hover_este_frame = true;
+                    }
+
+                    // Dibujar el bloque resaltador azul 
+                    if (byte_resaltado == (int)(i + j)) {
+                        draw_list->AddRectFilled(pos_min, pos_max, IM_COL32(0, 130, 255, 100));
+                    }
+                }
+                else {
+                    ImGui::Text("  ");
+                }
+
+                ImGui::SameLine(0, 0);
+                if (j == 7) ImGui::Text("   ");
+                else ImGui::Text(" ");
+                ImGui::SameLine(0, 0);
+            }
+
+            // --- COLUMNA ASCII ---
+            ImGui::SetCursorPosX(offset_ascii);
+
+			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 255, 255)); // Color azul cian para el texto ASCII
+            for (size_t j = 0; j < 16; j++) {
+                if (i + j < paquete_actual.raw_data.size()) {
+                    unsigned char byte = paquete_actual.raw_data[i + j];
+                    char c = (byte >= 32 && byte <= 126) ? (char)byte : '.';
+
+                    // Guardar las coordenadas de la letra
+                    ImVec2 pos_min = ImGui::GetCursorScreenPos();
+                    ImGui::Text("%c", c);
+                    ImVec2 pos_max = ImGui::GetItemRectMax();
+
+                    if (ImGui::IsItemHovered()) {
+                        byte_resaltado = (int)(i + j);
+                        algun_hover_este_frame = true;
+                    }
+
+                    // Aplicar el mismo bloque resaltador azul a la letra
+                    if (byte_resaltado == (int)(i + j)) {
+                        draw_list->AddRectFilled(pos_min, pos_max, IM_COL32(0, 130, 255, 100));
+                    }
+                }
+                ImGui::SameLine(0, 0);
+            }
+			ImGui::PopStyleColor();
+            ImGui::NewLine();
+        }
+
+        // Limpiar si quitamos el ratón del área
+        if (!algun_hover_este_frame) {
+            byte_resaltado = -1;
+        }
+
+    }
+    else {
+        ImGui::TextDisabled("Esperando seleccion de un paquete...");
+    }
+
     ImGui::EndChild();
+
 }
 
 
