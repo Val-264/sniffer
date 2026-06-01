@@ -6,6 +6,7 @@
 #include <pcap.h>
 #include <string>
 #include <sstream>
+#include <fstream>
 #include <vector>
 #include <memory> // para evitar fugas de memoria
 #include <ws2tcpip.h> 

@@ -37,14 +37,14 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
   char buffer_tiempo[64];
 
   // Mes, día, año , horas, minutos, segundos
-  strftime(buffer_tiempo, sizeof(buffer_tiempo), "%m %d, %Y  %H:%M:%S.", &info_tiempo);
+  strftime(buffer_tiempo, sizeof(buffer_tiempo), "%m %d %Y  %H:%M:%S.", &info_tiempo);
   record.tiempo_llegada = buffer_tiempo + to_string(pkthdr->ts.tv_sec);
 
   // Tiempo de llegada en formato UTC
   tm info_tiempo_utc;
   gmtime_s(&info_tiempo_utc, &segundos_totales); // gmtime_s calcula la hora cero global
   char buffer_utc[64];
-  strftime(buffer_utc, sizeof(buffer_utc), "%b %d, %Y %H:%M:%S", &info_tiempo_utc);
+  strftime(buffer_utc, sizeof(buffer_utc), "%b %d %Y %H:%M:%S", &info_tiempo_utc);
   record.tiempo_llegada_utc = string(buffer_utc) + "." + to_string(microsegundos * 1000) + " UTC";
 
   // Tiempo Epoch (Segundos.Microsegundos)
@@ -79,7 +79,7 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
     puntero_a_transporte = puntero_de_red + packet_hlen;
     tipo_de_protocolo = ip_hdr->ip_p;
   }
-  else if (eth_type == 0x08DD) {
+  else if (eth_type == 0x86DD) {
     ipv6_header *ipv6_hdr = (struct ipv6_header *)puntero_de_red;
 
     char packet_scrip[INET6_ADDRSTRLEN];

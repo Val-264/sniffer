@@ -8,7 +8,7 @@ static bool filtro_activo = false; // Bandera para controlar si se ha aplicado u
 static char filtro_antes_captura[256] = "";
 static char filtro_captura[256] = "";
 static string filtro_aplicado = "";
-bool coincide = true; // Mostrar todo el tráfico por defecto, pero si el usuario aplica un filtro, entonces solo mostrar los paquetes que coincidan con el filtro aplicado
+static bool coincide = true; // Mostrar todo el tráfico por defecto, pero si el usuario aplica un filtro, entonces solo mostrar los paquetes que coincidan con el filtro aplicado
 
 
 // =======================================================================================================================================
@@ -178,10 +178,57 @@ void mostrar_pantalla_analisis() {
         filtro_aplicado = string(filtro_captura);
     }    
 
-    ImGui::SameLine();
+    ImGui::Separator();
+	static bool exportar = false;
+    static char nombre_archivo[256] = "";
     if (ImGui::Button("Exportar")) {
         if (!capturando) {
+			exportar = true;
+        }
+    }
 
+    if (exportar) {
+        ImGui::SameLine();
+        char extension_archivo[10] = ".csv";
+
+        ImGui::Text(" | Nombre archivo: "); ImGui::SameLine();
+        ImGui::InputText("##NombreArchivo", nombre_archivo, IM_ARRAYSIZE(nombre_archivo));
+        ImGui::SameLine();
+        if (ImGui::Button("Guardar CSV")) {
+            strcat_s(nombre_archivo, extension_archivo);      // Añadir extensión al nombre ingresado por el usuario
+            ofstream archivo(nombre_archivo);
+            if (archivo.is_open()) {
+                exportar = false; 
+                // Escribir el encabezado del CSV 
+                archivo << "No.,Protocolo,Origen,Destino,Puerto Origen,Puerto Destino,Longitud (Bytes),Tiempo Local,Tiempo UTC,Tiempo Epoch\n";
+
+                // Bloquear el vector con el candado para leer los datos de forma segura
+                {
+                    lock_guard<mutex> lock(mutex_paquetes);
+
+                    for (const auto& pkt : paquetes_capturados) {
+                        archivo << pkt.id << ","
+                            << pkt.protocolo << ","
+                            << pkt.src_ip << ","
+                            << pkt.dest_ip << ","
+                            << pkt.src_port << ","
+                            << pkt.dest_port << ","
+                            << pkt.longitud_paquete << ","
+                            << pkt.tiempo_llegada << ","
+                            << pkt.tiempo_llegada_utc << ","
+                            << pkt.tiempo_epoch << "\n";
+                    }
+                }
+
+                archivo.close();
+				nombre_archivo[0] = '\0'; // Limpiar el nombre del archivo para la próxima exportación
+
+                // Imprimir confirmación en consola 
+                cout << "Trafico exportado a reporte_trafico.csv\n";
+            }
+            else {
+                cerr << "ERR: No se pudo crear el archivo CSV.\n";
+            }
         }
     }
 
