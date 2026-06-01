@@ -1,14 +1,21 @@
+// Control de la interfaz gráfica 
+
 #include "estructuras.h"
 
 static bool vista_analisis = false; // Bandera para controlar lo que se analiza en pantalla 
 static int interfaz_seleccionada = 0;
+static bool filtro_activo = false; // Bandera para controlar si se ha aplicado un filtro de captura o no
+static char filtro_antes_captura[256] = "";
+static char filtro_captura[256] = "";
+static string filtro_aplicado = "";
+bool coincide = true; // Mostrar todo el tráfico por defecto, pero si el usuario aplica un filtro, entonces solo mostrar los paquetes que coincidan con el filtro aplicado
 
 
 // =======================================================================================================================================
 //                                                      PANTALLA 1: SELECCIÓN DE INTERFAZ 
 // =======================================================================================================================================
 // @brief Dibuja la pantalla de selección de interfaz, permitiendo al usuario elegir una interfaz de red para iniciar la captura de paquetes
-void pantalla_interfaz() {
+void mostrar_pantalla_interfaz() {
     ImGui::Text("Bienvenido al Analizador de Trafico");
     ImGui::Separator();
     ImGui::Spacing();
@@ -31,6 +38,12 @@ void pantalla_interfaz() {
 
         ImGui::Spacing();
 
+		// Filtro de captura bpf opcional para que el usuario pueda escribir un filtro antes de iniciar la captura 
+        ImGui::Text("Filtro:");
+        ImGui::SetNextItemWidth(500);
+        ImGui::InputText("##FiltroBPF", filtro_antes_captura, IM_ARRAYSIZE(filtro_antes_captura));
+        ImGui::Spacing();
+
         // Cambiar de pantalla a análisis de tráfico al iniciar la captura
         if (ImGui::Button("Iniciar Captura", ImVec2(150, 30))) {
             char error_buffer[PCAP_ERRBUF_SIZE];
@@ -42,8 +55,11 @@ void pantalla_interfaz() {
                 longitud_encabezado_de_red = (link_hdr_type == DLT_NULL) ? 4 : (link_hdr_type == DLT_EN10MB) ? 14 : 0;
 
                 struct bpf_program bpf;
-                if (pcap_compile(capdev, &bpf, "", 0, 0) != PCAP_ERROR) {
+                if (pcap_compile(capdev, &bpf, filtro_antes_captura, 0, 0) != PCAP_ERROR) {
                     pcap_setfilter(capdev, &bpf);
+                }
+                else {
+					cerr << "ERR: No se pudo compilar el filtro BPF: " << pcap_geterr(capdev) << "\n";
                 }
 
                 capturando = true;
@@ -57,11 +73,58 @@ void pantalla_interfaz() {
     }
 }
 
+/*
+* @brief Aplica el filtro de captura escrito por el usuario en la interfaz gráfica, mostrando solo los paquetes que coincidan con el filtro aplicado
+* @param i Índice del paquete en el vector global de paquetes capturados que se está evaluando para mostrar en la tabla de análisis de tráfico
+*/
+void filtrar_trafico(int i) {
+    if (!filtro_aplicado.empty()) {
+        coincide = false;
+
+        // Copiamos el filtro y lo pasamos a minúsculas
+        string filtro = filtro_aplicado;
+        for (auto& c : filtro) c = tolower(c);
+
+        string prot = paquetes_capturados[i].protocolo;
+        for (auto& c : prot) c = tolower(c);
+
+        string ip_src = paquetes_capturados[i].src_ip;
+        string ip_dst = paquetes_capturados[i].dest_ip;
+        string p_src = to_string(paquetes_capturados[i].src_port);
+        string p_dst = to_string(paquetes_capturados[i].dest_port);
+
+        size_t pos_eq = filtro.find("==");
+
+        if (pos_eq != string::npos) {
+            string clave = filtro.substr(0, pos_eq);
+            string valor = filtro.substr(pos_eq + 2);
+
+            clave.erase(0, clave.find_first_not_of(" \t"));
+            clave.erase(clave.find_last_not_of(" \t") + 1);
+            valor.erase(0, valor.find_first_not_of(" \t"));
+            valor.erase(valor.find_last_not_of(" \t") + 1);
+
+            if (clave == "ip.src" && ip_src.find(valor) != string::npos) coincide = true;
+            else if (clave == "ip.dst" && ip_dst.find(valor) != string::npos) coincide = true;
+            else if ((clave == "tcp.srcport" || clave == "udp.srcport") && p_src == valor) coincide = true;
+            else if ((clave == "tcp.dstport" || clave == "udp.dstport") && p_dst == valor) coincide = true;
+            else if ((clave == "tcp.port" || clave == "udp.port") && (p_src == valor || p_dst == valor)) coincide = true;
+        }
+        else {
+            filtro.erase(0, filtro.find_first_not_of(" \t"));
+            filtro.erase(filtro.find_last_not_of(" \t") + 1);
+
+            // Si escriben solo el protocolo 
+            if (prot == filtro) coincide = true;
+        }
+    }
+}
+
 // =======================================================================================================================================
 //                                                      PANTALLA 2: ANÁLISIS DE TRÁFICO
 // =======================================================================================================================================
 // @brief Dibuja la pantalla de análisis de tráfico, mostrando la lista de paquetes capturados y detalles del paquete seleccionado
-void pantalla_analisis() {
+void mostrar_pantalla_analisis() {
     // --- BARRA DE HERRAMIENTAS SUPERIOR ---
     if (ImGui::Button("Detener")) {
         if (capturando) {
@@ -91,10 +154,30 @@ void pantalla_analisis() {
 
         vista_analisis = false;
     }
+
     ImGui::SameLine();
     ImGui::Text(" | Filtro:"); ImGui::SameLine();
-    static char filtro_texto[128] = "";
-    ImGui::InputText("##Filtro", filtro_texto, IM_ARRAYSIZE(filtro_texto));
+    ImGui::InputText("##Filtro", filtro_captura, IM_ARRAYSIZE(filtro_captura));
+
+	if (!filtro_activo && strlen(filtro_captura) > 0) {
+		filtro_activo = true;
+	}
+	else if (filtro_activo && strlen(filtro_captura) == 0) {
+		filtro_activo = false;
+	}
+
+    ImGui::SameLine();
+    if (ImGui::Button("Quitar Filtro")) {
+            filtro_captura[0] = '\0'; // Limpiar el filtro
+            filtro_aplicado = "";
+			coincide = true; // Mostrar todo el tráfico nuevamente
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Aplicar Filtro")) {
+        filtro_aplicado = string(filtro_captura);
+    }    
+
     ImGui::SameLine();
     if (ImGui::Button("Exportar")) {
         if (!capturando) {
@@ -124,7 +207,7 @@ void pantalla_analisis() {
         ImGuiTableFlags_HighlightHoveredColumn;
 
     if (ImGui::BeginTable("TablaPaquetes", 6, banderas_tabla)) {
-        // 1. Configurar los títulos y anchos de las columnas
+        // Configurar los títulos y anchos de las columnas
         ImGui::TableSetupColumn("No.", ImGuiTableColumnFlags_WidthFixed, 40.0f);
         ImGui::TableSetupColumn("Protocolo", ImGuiTableColumnFlags_WidthFixed, 80.0f);
         ImGui::TableSetupColumn("Origen");
@@ -138,7 +221,13 @@ void pantalla_analisis() {
             lock_guard<mutex> lock(mutex_paquetes); // Aseguramos que no haya acceso concurrente a la lista de paquetes
 
             for (int i = 0; i < paquetes_capturados.size(); i++) {
+				filtrar_trafico(i); 
+                // Si el paquete no cumple con el filtro, saltar a la siguiente iteración sin dibujarlo
+                if (!coincide) continue;
+
                 ImGui::TableNextRow();
+
+				ImGui::PushID(i); // Usar el índice como ID para evitar conflictos en la tabla
 
                 // Verificamos si esta es la fila a la que el usuario le dio clic
                 bool esta_seleccionado = (indice_paquete_seleccionado == i);
@@ -154,11 +243,11 @@ void pantalla_analisis() {
                 ImGui::TableSetColumnIndex(1);
                 ImGui::TextUnformatted(paquetes_capturados[i].protocolo.c_str());
 
-                // Columna 2: IP Origen
+                // Columna 2: Origen
                 ImGui::TableSetColumnIndex(2);
                 ImGui::TextUnformatted(paquetes_capturados[i].src_ip.c_str());
 
-                // Columna 3: IP Destino
+                // Columna 3: Destino
                 ImGui::TableSetColumnIndex(3);
                 ImGui::TextUnformatted(paquetes_capturados[i].dest_ip.c_str());
 
@@ -172,6 +261,8 @@ void pantalla_analisis() {
                 ImGui::TableSetColumnIndex(5);
 				string long_paquete = to_string(paquetes_capturados[i].longitud_paquete) + " bytes";
                 ImGui::TextUnformatted(long_paquete.c_str());
+
+				ImGui::PopID();
             }
         }
         ImGui::EndTable();
@@ -408,10 +499,12 @@ void dibujarInterfaz() {
     ImGui::Begin("Sniffer de Red", nullptr, ImGuiWindowFlags_NoCollapse);
 
     if (!vista_analisis) {
-		pantalla_interfaz();
+		mostrar_pantalla_interfaz();
+        if (!capturando) { filtro_captura[0] = '\0'; }
     }
     else {
-		pantalla_analisis();
+		mostrar_pantalla_analisis();
+        if (!capturando) { filtro_antes_captura[0] = '\0'; }
     }
 
     ImGui::End();

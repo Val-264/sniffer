@@ -1,3 +1,5 @@
+// Control general del sniffer y almacenamiento y captura de paquetes en un vector global para mostrarlos en la interfaz gráfica
+
 #include "estructuras.h"
 // Inicializar variables globales 
 // Almacenamiento global de paquetes capturados

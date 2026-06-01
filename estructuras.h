@@ -1,3 +1,5 @@
+// Este archivo de encabezado define las estructuras de datos y variables globales utilizadas en el programa de captura de paquetes.
+
 #ifndef ESTRUCTURAS_H
 #define ESTRUCTURAS_H
 #include <iostream>
