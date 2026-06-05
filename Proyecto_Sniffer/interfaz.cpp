@@ -210,7 +210,17 @@ void mostrar_pantalla_analisis() {
         vista_analisis = false;
     }
 
+	ImGui::SameLine();
+    if (ImGui::Button("Tema obscuro")) {
+        ImGui::StyleColorsDark();
+    }
+
     ImGui::SameLine();
+    if (ImGui::Button("Tema claro")) {
+        ImGui::StyleColorsLight();
+    }
+
+    ImGui::Separator();
     if (ImGui::Button("Detener")) {
         if (capturando) {
             capturando = false;

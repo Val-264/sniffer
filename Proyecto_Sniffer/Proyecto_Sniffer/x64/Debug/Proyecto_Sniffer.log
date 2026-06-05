@@ -1,1 +1,4 @@
-﻿  Proyecto_Sniffer.vcxproj -> C:\Users\carme\OneDrive\Documents\UNI\SEM4\Redes 1\ProyectoSniffer\sniffer\Proyecto_Sniffer\x64\Debug\Proyecto_Sniffer.exe
+﻿  interfaz.cpp
+C:\Users\carme\OneDrive\Documents\UNI\SEM4\Redes 1\ProyectoSniffer\sniffer\Proyecto_Sniffer\interfaz.cpp(392,24): warning C4267: 'argumento': conversión de 'size_t' a 'int'; posible pérdida de datos
+C:\Users\carme\OneDrive\Documents\UNI\SEM4\Redes 1\ProyectoSniffer\sniffer\Proyecto_Sniffer\interfaz.cpp(607,36): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+  Proyecto_Sniffer.vcxproj -> C:\Users\carme\OneDrive\Documents\UNI\SEM4\Redes 1\ProyectoSniffer\sniffer\Proyecto_Sniffer\x64\Debug\Proyecto_Sniffer.exe
