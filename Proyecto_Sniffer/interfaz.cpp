@@ -190,15 +190,7 @@ void mostrar_pantalla_analisis() {
     // en blanco y nombres repetidos, poner archivos en una ruta específica 
 
     // --- BARRA DE HERRAMIENTAS SUPERIOR ---
-    if (ImGui::Button("Detener")) {
-        if (capturando) {
-            capturando = false;
-            if (capdev != nullptr) pcap_breakloop(capdev);
-            if (hilo_de_captura.joinable()) hilo_de_captura.join();
-            if (capdev != nullptr) { pcap_close(capdev); capdev = nullptr; }
-        }
-    }
-    ImGui::SameLine();
+    
     if (ImGui::Button("Volver a Interfaces")) {
         // Ocultar vista de análisis y volver al menu de interfaces 
         if (capturando) {
@@ -215,9 +207,25 @@ void mostrar_pantalla_analisis() {
             id_paquete = 0;
         }
 
-
-
         vista_analisis = false;
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Detener")) {
+        if (capturando) {
+            capturando = false;
+            if (capdev != nullptr) pcap_breakloop(capdev);
+            if (hilo_de_captura.joinable()) hilo_de_captura.join();
+            if (capdev != nullptr) { pcap_close(capdev); capdev = nullptr; }
+        }
+    }
+
+
+    ImGui::SameLine();
+    if (ImGui::Button("Reiniciar captura")) {
+        if (!capturando) {
+
+        }
     }
 
     ImGui::SameLine();

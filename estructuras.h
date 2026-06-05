@@ -11,6 +11,7 @@
 #include <memory> // para evitar fugas de memoria
 #include <ws2tcpip.h> 
 #include <ctime>   // Para manejo de fechas y horas (marca de tiempo de los paquetes)
+#include <iomanip>
 // Para manejo de hilos 
 #include <thread> // Para uso de hilos 
 #include <atomic> // Para gesionar la concurrencia y la ejecución entre múltiples hilos en ejecución 

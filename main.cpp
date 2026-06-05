@@ -61,8 +61,22 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
   // Capas de enlace y de red 
   if (eth_type == 0x0806) { // Protococlo de resolución de direcciones (ARP)
     record.protocolo = "ARP";
-    record.src_ip = "MAC: " + to_string(eth_hdr->src_mac[0]);
-    record.dest_ip = "MAC: " + to_string(eth_hdr->dest_mac[0]);
+
+    // Formatear MAC Origen
+    stringstream ss_src;
+    for (int i = 0; i < 6; ++i) {
+        ss_src << setfill('0') << setw(2) << hex << (int)eth_hdr->src_mac[i];
+        if (i < 5) ss_src << ":";
+    }
+    record.src_ip = ss_src.str();
+
+    // Formatear MAC Destino
+    stringstream ss_dest;
+    for (int i = 0; i < 6; ++i) {
+        ss_dest << setfill('0') << setw(2) << hex << (int)eth_hdr->dest_mac[i];
+        if (i < 5) ss_dest << ":";
+    }
+    record.dest_ip = ss_dest.str();
   } 
   else if (eth_type == 0x0800) { // Protocolo de internet versión 4
     ip_header *ip_hdr = (struct ip_header *)puntero_de_red;
