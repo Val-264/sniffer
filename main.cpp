@@ -18,7 +18,7 @@ thread hilo_de_captura;
 * @brief             Procesa los pquetes capturados 
 * @param user        Último argumento pasado a pcap_loop
 * @param pkthdr      Puntero a la estructura Packet Header (pcap_pkthdr), apunta a la marca de tiempo y longitudes del paquete
-* @param packetd_ptr Puntero a los daots del paquete 
+* @param packetd_ptr Puntero a los datos del paquete 
 */
 void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packetd_ptr) {
   Datos_Paquete record;
@@ -253,6 +253,7 @@ int main(int argc, char const *argv[]) {
 
     // Bucle de la interfaz gráfica 
     while (!glfwWindowShouldClose(ventana)) {
+
         // Captura de eventos como movimiento del mouse, click
         glfwPollEvents();
 
@@ -268,9 +269,10 @@ int main(int argc, char const *argv[]) {
 
         glfwGetFramebufferSize(ventana, &ancho_ventana, &alto_ventana);
         glViewport(0, 0, ancho_ventana, alto_ventana);
-        glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
 
         glfwSwapBuffers(ventana);
 
@@ -292,6 +294,7 @@ int main(int argc, char const *argv[]) {
         pcap_close(capdev);
     }
 
+    // Limpiar interfaz 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
