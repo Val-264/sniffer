@@ -6,5 +6,5 @@ Release/
 *.exe 
 *.json 
 *.csv
-*.imgui.ini
+imgui.ini
 *.user
