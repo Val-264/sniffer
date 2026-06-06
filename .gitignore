@@ -1,5 +1,10 @@
 .vs/
-*.exe
-*.json
-*.slnx
+x64/
+Debug/
+Release/
+ 
+*.exe 
+*.json 
 *.csv
+*.imgui.ini
+*.user
