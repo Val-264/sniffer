@@ -19,6 +19,8 @@ static bool contenido_filtrado = false;
 static bool exportacion_seleccionada = false;
 static bool exportacion_exitosa = false;
 
+static bool nombre_csv_vacio = false;
+
 // Banderas para las checkboxes de contenido personalizado
 static bool no_columna = false;
 static bool protocolo_columna = false;
@@ -44,13 +46,30 @@ void establecer_estilo_general() {
     estilo_gral.PopupRounding = 5.0f;
 }
 
+void cambiar_tema_obscuro() {
+	if (ImGui::Button("Tema obscuro")) {
+		ImGui::StyleColorsDark();
+	}
+}
+
+void cambiar_tema_claro() {
+    if (ImGui::Button("Tema claro")) {
+        ImGui::StyleColorsLight();
+    }
+}
+
 // =======================================================================================================================================
 //                                                      PANTALLA 1: SELECCIÓN DE INTERFAZ 
 // =======================================================================================================================================
 // @brief Dibuja la pantalla de selección de interfaz, permitiendo al usuario elegir una interfaz de red para iniciar la captura de paquetes
 void mostrar_pantalla_interfaz() {
 
-    ImGui::Text("Bienvenido al Analizador de Trafico\nSelecciona una interfaz para comenzar a capturar\n");
+	cambiar_tema_obscuro();
+	ImGui::SameLine();
+    cambiar_tema_claro();
+    ImGui::Separator();
+
+    ImGui::Text("BIENVENIDO AL ANALIZADOR DE TRAFICO\n\nSELECCIONA UNA INTERFAZ PARA COMENZAR\n");
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -186,8 +205,6 @@ void filtrar_trafico(int i) {
 // @brief Dibuja la pantalla de análisis de tráfico, mostrando la lista de paquetes capturados y detalles del paquete seleccionado
 void mostrar_pantalla_analisis() {
     static bool exportar = false;
-    // @TODO arreglar para que valide nombres
-    // en blanco y nombres repetidos, poner archivos en una ruta específica 
 
     // --- BARRA DE HERRAMIENTAS SUPERIOR ---
     
@@ -211,14 +228,10 @@ void mostrar_pantalla_analisis() {
     }
 
 	ImGui::SameLine();
-    if (ImGui::Button("Tema obscuro")) {
-        ImGui::StyleColorsDark();
-    }
+    cambiar_tema_obscuro();
 
     ImGui::SameLine();
-    if (ImGui::Button("Tema claro")) {
-        ImGui::StyleColorsLight();
-    }
+	cambiar_tema_claro();
 
     ImGui::Separator();
     if (ImGui::Button("Detener")) {
@@ -276,8 +289,8 @@ void mostrar_pantalla_analisis() {
 
         // Contendio de la ventana emergente 
 		if (!exportacion_seleccionada) {
-            ImGui::OpenPopup("Configuracion de exportacion");
-            if (ImGui::BeginPopupModal("Configuracion de exportacion", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::OpenPopup("Configurar exportacion");
+            if (ImGui::BeginPopupModal("Configurar exportacion", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 
                 if (ImGui::Selectable(">> Contenido por default")) {
                     contenido_por_default = true;
@@ -317,8 +330,8 @@ void mostrar_pantalla_analisis() {
 		}
 
         if (personalizar) {
-            ImGui::OpenPopup("Exportacion personalizada");
-            if (ImGui::BeginPopupModal("Exportacion personalizada", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::OpenPopup("Personalizar");
+            if (ImGui::BeginPopupModal("Personalizar", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
                 ImGui::Checkbox("No.", &no_columna); ImGui::Spacing();
                 ImGui::Checkbox("Protocolo", &protocolo_columna); ImGui::Spacing();
                 ImGui::Checkbox("Origen (IP/MAC)", &origen_columna); ImGui::Spacing();
@@ -331,6 +344,15 @@ void mostrar_pantalla_analisis() {
                 ImGui::Checkbox("Tiempo Epoch", &tiempo_epoch_columna); ImGui::Separator();
                 if (ImGui::Button("OK")) {
                     personalizar = false;
+					if (!no_columna && !protocolo_columna && !origen_columna && !destino_columna && !puerto_origen_columna 
+                        && !puerto_destino_columna && !longitud_columna && !tiempo_local_columna && !tiempo_utc_columna 
+                        && !tiempo_epoch_columna) {
+						// Si el usuario no selecciona ninguna columna, se cancela la exportación para evitar crear un CSV sin datos
+						exportar = false;
+						limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
+                       
+					}
+                    
                     ImGui::CloseCurrentPopup();
                     
                 }
@@ -346,132 +368,162 @@ void mostrar_pantalla_analisis() {
        
 		// Capturar nombre del archivo a exportar
         char extension_archivo[10] = ".csv";
+		char carpeta_exportacion[500] = "exportaciones_csv/";
         ImGui::SameLine();
         ImGui::Text(" | Nombre archivo: "); ImGui::SameLine();
         ImGui::InputText("##NombreArchivo", nombre_archivo, IM_ARRAYSIZE(nombre_archivo));
-        ImGui::SameLine();
+        ImGui::SameLine();     
 
 
         if (ImGui::Button("Guardar CSV")) {
-            strcat_s(nombre_archivo, extension_archivo);      // Añadir extensión al nombre ingresado por el usuario
-            ofstream archivo(nombre_archivo);
-            if (archivo.is_open()) {
-                exportar = false; 
+            
+			if (strlen(nombre_archivo) == 0) {
+				nombre_csv_vacio = true;
+                ImGui::OpenPopup("Nombre de archivo requerido");
+			}
+			else {
+				nombre_csv_vacio = false;
+                strcat_s(nombre_archivo, extension_archivo);      // Añadir extensión al nombre ingresado por el usuario
+                strcat_s(carpeta_exportacion, nombre_archivo);
+                ofstream archivo(carpeta_exportacion);
+                if (archivo.is_open()) {
+                    exportar = false;
 
-                if (contenido_por_default) {
-                    // Escribir el encabezado del CSV 
-                    archivo << "No.,Protocolo,Origen,Destino,Puerto Origen,Puerto Destino,Longitud (Bytes),Tiempo Local,Tiempo UTC,Tiempo Epoch\n";
+                    if (contenido_por_default) {
+                        // Escribir el encabezado del CSV 
+                        archivo << "No.,Protocolo,Origen,Destino,Puerto Origen,Puerto Destino,Longitud (Bytes),Tiempo Local,Tiempo UTC,Tiempo Epoch\n";
 
-                    // Bloquear el vector con el candado para leer los datos de forma segura
-                    {
-                        lock_guard<mutex> lock(mutex_paquetes);
+                        // Bloquear el vector con el candado para leer los datos de forma segura
+                        {
+                            lock_guard<mutex> lock(mutex_paquetes);
 
-                        for (const auto& pkt : paquetes_capturados) {
-                            archivo << pkt.id << ","
-                                << pkt.protocolo << ","
-                                << pkt.src_ip << ","
-                                << pkt.dest_ip << ","
-                                << pkt.src_port << ","
-                                << pkt.dest_port << ","
-                                << pkt.longitud_paquete << ","
-                                << pkt.tiempo_llegada << ","
-                                << pkt.tiempo_llegada_utc << ","
-                                << pkt.tiempo_epoch << "\n";
-                        }
-                    }
-
-                }
-
-				if (contenido_filtrado) {
-					// Escribir el encabezado del CSV 
-					archivo << "No.,Protocolo,Origen,Destino,Puerto Origen,Puerto Destino,Longitud (Bytes),Tiempo Local,Tiempo UTC,Tiempo Epoch\n";
-					// Bloquear el vector con el candado para leer los datos de forma segura
-					{
-						lock_guard<mutex> lock(mutex_paquetes);
-                        for (size_t i = 0; i < paquetes_capturados.size(); i++) {
-							filtrar_trafico(i);
-							if (coincide) {
-								const auto& pkt = paquetes_capturados[i];
-								archivo << pkt.id << ","
-									<< pkt.protocolo << ","
-									<< pkt.src_ip << ","
-									<< pkt.dest_ip << ","
-									<< pkt.src_port << ","
-									<< pkt.dest_port << ","
-									<< pkt.longitud_paquete << ","
-									<< pkt.tiempo_llegada << ","
-									<< pkt.tiempo_llegada_utc << ","
-									<< pkt.tiempo_epoch << "\n";
-							}
-						}
-					}
-				}
-
-                if (contenido_personalizado) {
-
-                    // Formar encabezado de CVS dependiendo de la selección del usuario
-                    if (no_columna) archivo << "No.,";
-					if (protocolo_columna) archivo << "Protocolo,";
-					if (origen_columna) archivo << "Origen,";
-					if (destino_columna) archivo << "Destino,";
-					if (puerto_origen_columna) archivo << "Puerto Origen,";
-					if (puerto_destino_columna) archivo << "Puerto Destino,";
-					if (longitud_columna) archivo << "Longitud (Bytes),";
-					if (tiempo_local_columna) archivo << "Tiempo Local,";
-					if (tiempo_utc_columna) archivo << "Tiempo UTC,";
-					if (tiempo_epoch_columna) archivo << "Tiempo Epoch,";
-					archivo << "\n";
-
-                    {
-                        lock_guard<mutex> lock(mutex_paquetes);
-                        for (const auto& pkt : paquetes_capturados) {
-                            filtrar_trafico(pkt.id - 1); // El ID del paquete es su posición en la lista + 1, entonces para obtener la posición correcta restamos 1
-                            if (coincide) {
-                                if (no_columna) archivo << pkt.id << ",";
-                                if (protocolo_columna) archivo << pkt.protocolo << ",";
-                                if (origen_columna) archivo << pkt.src_ip << ",";
-                                if (destino_columna) archivo << pkt.dest_ip << ",";
-                                if (puerto_origen_columna) archivo << pkt.src_port << ",";
-                                if (puerto_destino_columna) archivo << pkt.dest_port << ",";
-                                if (longitud_columna) archivo << pkt.longitud_paquete << ",";
-                                if (tiempo_local_columna) archivo << pkt.tiempo_llegada << ",";
-                                if (tiempo_utc_columna) archivo << pkt.tiempo_llegada_utc << ",";
-                                if (tiempo_epoch_columna) archivo << pkt.tiempo_epoch;
-                                archivo << "\n";
+                            for (const auto& pkt : paquetes_capturados) {
+                                archivo << pkt.id << ","
+                                    << pkt.protocolo << ","
+                                    << pkt.src_ip << ","
+                                    << pkt.dest_ip << ","
+                                    << pkt.src_port << ","
+                                    << pkt.dest_port << ","
+                                    << pkt.longitud_paquete << ","
+                                    << pkt.tiempo_llegada << ","
+                                    << pkt.tiempo_llegada_utc << ","
+                                    << pkt.tiempo_epoch << "\n";
                             }
                         }
-                        
+
                     }
 
-
-                    
-                }
-
-                archivo.close();
-				nombre_archivo[0] = '\0'; // Limpiar el nombre del archivo para la próxima exportación
-
-				exportacion_exitosa = true;
-
-                cout << "Exportacion exitosa archivo creado";
-				
-            }
-            else {
-                ImGui::OpenPopup("Fallo al exportar");
-                if (ImGui::BeginPopupModal("Fallo al exportar", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-                    ImGui::TextUnformatted("No se pudo crear el archivo CSV");
-                    ImGui::Spacing();
-                    if (ImGui::Button("OK", ImVec2(80.0f, 30.0f))) {
-                        // Limpiar banderas de exportación para la próxima vez
-						limpiar_banderas_exportacion();
-
-                        ImGui::CloseCurrentPopup();
+                    if (contenido_filtrado) {
+                        // Escribir el encabezado del CSV 
+                        archivo << "No.,Protocolo,Origen,Destino,Puerto Origen,Puerto Destino,Longitud (Bytes),Tiempo Local,Tiempo UTC,Tiempo Epoch\n";
+                        // Bloquear el vector con el candado para leer los datos de forma segura
+                        {
+                            lock_guard<mutex> lock(mutex_paquetes);
+                            for (size_t i = 0; i < paquetes_capturados.size(); i++) {
+                                filtrar_trafico(i);
+                                if (coincide) {
+                                    const auto& pkt = paquetes_capturados[i];
+                                    archivo << pkt.id << ","
+                                        << pkt.protocolo << ","
+                                        << pkt.src_ip << ","
+                                        << pkt.dest_ip << ","
+                                        << pkt.src_port << ","
+                                        << pkt.dest_port << ","
+                                        << pkt.longitud_paquete << ","
+                                        << pkt.tiempo_llegada << ","
+                                        << pkt.tiempo_llegada_utc << ","
+                                        << pkt.tiempo_epoch << "\n";
+                                }
+                            }
+                        }
                     }
-                    ImGui::EndPopup();
+
+                    if (contenido_personalizado) {
+
+                        // Formar encabezado de CVS dependiendo de la selección del usuario
+                        if (no_columna) archivo << "No.,";
+                        if (protocolo_columna) archivo << "Protocolo,";
+                        if (origen_columna) archivo << "Origen,";
+                        if (destino_columna) archivo << "Destino,";
+                        if (puerto_origen_columna) archivo << "Puerto Origen,";
+                        if (puerto_destino_columna) archivo << "Puerto Destino,";
+                        if (longitud_columna) archivo << "Longitud (Bytes),";
+                        if (tiempo_local_columna) archivo << "Tiempo Local,";
+                        if (tiempo_utc_columna) archivo << "Tiempo UTC,";
+                        if (tiempo_epoch_columna) archivo << "Tiempo Epoch,";
+                        archivo << "\n";
+
+                        {
+                            lock_guard<mutex> lock(mutex_paquetes);
+                            for (const auto& pkt : paquetes_capturados) {
+                                filtrar_trafico(pkt.id - 1); // El ID del paquete es su posición en la lista + 1, entonces para obtener la posición correcta restamos 1
+                                if (coincide) {
+                                    if (no_columna) archivo << pkt.id << ",";
+                                    if (protocolo_columna) archivo << pkt.protocolo << ",";
+                                    if (origen_columna) archivo << pkt.src_ip << ",";
+                                    if (destino_columna) archivo << pkt.dest_ip << ",";
+                                    if (puerto_origen_columna) archivo << pkt.src_port << ",";
+                                    if (puerto_destino_columna) archivo << pkt.dest_port << ",";
+                                    if (longitud_columna) archivo << pkt.longitud_paquete << ",";
+                                    if (tiempo_local_columna) archivo << pkt.tiempo_llegada << ",";
+                                    if (tiempo_utc_columna) archivo << pkt.tiempo_llegada_utc << ",";
+                                    if (tiempo_epoch_columna) archivo << pkt.tiempo_epoch;
+                                    archivo << "\n";
+                                }
+                            }
+
+                        }
+
+                    }
+
+                    archivo.close();
+                    nombre_archivo[0] = '\0'; // Limpiar el nombre del archivo para la próxima exportación
+
+                    exportacion_exitosa = true;
+
+                    cout << "Exportacion exitosa archivo creado";
+
+                }
+                else {
+                    ImGui::OpenPopup("Fallo al exportar");
+                    if (ImGui::BeginPopupModal("Fallo al exportar", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+                        ImGui::TextUnformatted("No se pudo crear el archivo CSV");
+                        ImGui::Spacing();
+                        if (ImGui::Button("OK", ImVec2(80.0f, 30.0f))) {
+                            // Limpiar banderas de exportación para la próxima vez
+                            limpiar_banderas_exportacion();
+
+                            ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::EndPopup();
+                    }
+
+                    cerr << "ERR: No se pudo crear el archivo CSV.\n";
                 }
 
-                cerr << "ERR: No se pudo crear el archivo CSV.\n";
-            }
+			}
         }
+
+		ImGui::SameLine();
+        if (ImGui::Button("Cancelar exportacion")) {
+            exportar = false;
+			limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
+        }
+    }
+
+    if (nombre_csv_vacio) {
+        // Si el usuario no ingresa un nombre de archivo, se muestra un error y no se procede con la exportación
+        ImGui::OpenPopup("Nombre de archivo requerido");
+        if (ImGui::BeginPopupModal("Nombre de archivo requerido", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextUnformatted("Por favor ingresa un nombre para el archivo CSV.");
+            ImGui::Spacing();
+            if (ImGui::Button("OK", ImVec2(80.0f, 30.0f))) {
+                nombre_csv_vacio = false; // Reiniciar bandera para la próxima vez
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
     }
 
     if (exportacion_exitosa) {
