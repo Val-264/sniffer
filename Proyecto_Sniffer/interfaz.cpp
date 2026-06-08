@@ -10,8 +10,11 @@ static char filtro_captura[256] = "";
 static string filtro_aplicado = "";
 static bool coincide = true; // Mostrar todo el tráfico por defecto, pero si el usuario aplica un filtro, entonces solo mostrar los paquetes que coincidan con el filtro aplicado
 
+namespace fs = std::filesystem;
 
 // Banderas para controlar la exportación de tráfico a CSV
+static bool exportar = false;
+
 static bool contenido_por_default = false;
 static bool contenido_personalizado = false;
 static bool personalizar = false;
@@ -134,6 +137,7 @@ void mostrar_pantalla_interfaz() {
 
 // *@briefLimpiar banderas de exportacion para no afectar a la siguiente exportacion
 void limpiar_banderas_exportacion() {
+    exportar = false;
     contenido_por_default = false;
     contenido_personalizado = false;
     personalizar = false;
@@ -202,9 +206,11 @@ void filtrar_trafico(int i) {
 // =======================================================================================================================================
 //                                                      PANTALLA 2: ANÁLISIS DE TRÁFICO
 // =======================================================================================================================================
+
+ 
+ 
 // @brief Dibuja la pantalla de análisis de tráfico, mostrando la lista de paquetes capturados y detalles del paquete seleccionado
 void mostrar_pantalla_analisis() {
-    static bool exportar = false;
 
     // --- BARRA DE HERRAMIENTAS SUPERIOR ---
     
@@ -383,6 +389,11 @@ void mostrar_pantalla_analisis() {
 			}
 			else {
 				nombre_csv_vacio = false;
+
+                if (!fs::exists(carpeta_exportacion)) {
+					fs::create_directory(carpeta_exportacion);
+                }
+
                 strcat_s(nombre_archivo, extension_archivo);      // Añadir extensión al nombre ingresado por el usuario
                 strcat_s(carpeta_exportacion, nombre_archivo);
                 ofstream archivo(carpeta_exportacion);
