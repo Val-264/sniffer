@@ -4,11 +4,20 @@
 
 static bool vista_analisis = false; // Bandera para controlar lo que se analiza en pantalla 
 static int interfaz_seleccionada = 0;
+
+// Variables para el filtro de captura
 static bool filtro_activo = false; // Bandera para controlar si se ha aplicado un filtro de captura o no
+static bool filtro_activo_en_captura = false;
 static char filtro_antes_captura[256] = "";
 static char filtro_captura[256] = "";
 static string filtro_aplicado = "";
 static bool coincide = true; // Mostrar todo el tráfico por defecto, pero si el usuario aplica un filtro, entonces solo mostrar los paquetes que coincidan con el filtro aplicado
+
+// Variable compartidas entre área 1, 2 y 3 
+static int indice_paquete_seleccionado = -1;     // Variable para recordar qué paquete (fila) seleccionó el usuario
+// Hacer una copia segura del paquete seleccionado para no mantener el candado cerrado mucho tiempo
+static bool hay_seleccion = false;
+Datos_Paquete paquete_actual;
 
 namespace fs = std::filesystem;
 
@@ -37,6 +46,10 @@ static bool tiempo_utc_columna = false;
 static bool tiempo_epoch_columna = false;
 
 
+// =======================================================================================================================================
+//                                                      FUNCIONES COMPARTIDAS POR AMBAS INTERAFACES 
+// =======================================================================================================================================
+
 // *@brief Estilo aplicable a toda la interfaz 
 void establecer_estilo_general() {
     ImGuiStyle& estilo_gral = ImGui::GetStyle();
@@ -59,6 +72,35 @@ void cambiar_tema_claro() {
     if (ImGui::Button("Tema claro")) {
         ImGui::StyleColorsLight();
     }
+}
+
+// @breif Abre la interfaz de red seleccionada por el usuario para iniciar la captura de paquetes, 
+// configurando el filtro de captura BPF si el usuario escribió un filtro antes de iniciar la captura, 
+// y obteniendo la longitud del encabezado de enlace para procesar correctamente los paquetes capturados 
+// dependiendo del tipo de enlace de la interfaz seleccionada
+bool abrir_y_configurar_interfaz() {
+    char error_buffer[PCAP_ERRBUF_SIZE];
+    string device_name = lista_interfaces_de_red[interfaz_seleccionada].nombre_tecnico;
+
+    capdev = pcap_open_live(device_name.c_str(), BUFSIZ, 1, 1000, error_buffer);
+
+    if (capdev == nullptr) {
+        cerr << "ERR: No se pudo abrir la interfaz " << device_name << ": " << error_buffer << "\n";
+        return false;
+    }
+
+    int link_hdr_type = pcap_datalink(capdev);
+    longitud_encabezado_de_red = (link_hdr_type == DLT_NULL) ? 4 : (link_hdr_type == DLT_EN10MB) ? 14 : 0;
+
+    struct bpf_program bpf;
+    if (pcap_compile(capdev, &bpf, filtro_antes_captura, 0, 0) != PCAP_ERROR) {
+        pcap_setfilter(capdev, &bpf);
+    }
+    else {
+        cerr << "ERR: No se pudo compilar el filtro BPF: " << pcap_geterr(capdev) << "\n";
+    }
+
+    return true;
 }
 
 // =======================================================================================================================================
@@ -104,26 +146,11 @@ void mostrar_pantalla_interfaz() {
 		ImGui::PopStyleVar(2); // ButtonTextAlign
 
         if (hay_seleccion) {
-            char error_buffer[PCAP_ERRBUF_SIZE];
-            string device_name = lista_interfaces_de_red[interfaz_seleccionada].nombre_tecnico;
-
-            capdev = pcap_open_live(device_name.c_str(), BUFSIZ, 1, 1000, error_buffer);
-            if (capdev != nullptr) {
-                int link_hdr_type = pcap_datalink(capdev);
-                longitud_encabezado_de_red = (link_hdr_type == DLT_NULL) ? 4 : (link_hdr_type == DLT_EN10MB) ? 14 : 0;
-
-                struct bpf_program bpf;
-                if (pcap_compile(capdev, &bpf, filtro_antes_captura, 0, 0) != PCAP_ERROR) {
-                    pcap_setfilter(capdev, &bpf);
-                }
-                else {
-                    cerr << "ERR: No se pudo compilar el filtro BPF: " << pcap_geterr(capdev) << "\n";
-                }
-
+			if (abrir_y_configurar_interfaz()) {
                 capturando = true;
                 vista_analisis = true; // Cambiar la vista a análisis de tráfico
                 hilo_de_captura = thread(captura_de_paquetes);
-            }
+			}
 
         }
 
@@ -135,7 +162,11 @@ void mostrar_pantalla_interfaz() {
     }
 }
 
-// *@briefLimpiar banderas de exportacion para no afectar a la siguiente exportacion
+// =======================================================================================================================================
+//                                                      PANTALLA 2: ANÁLISIS DE TRÁFICO
+// =======================================================================================================================================
+
+// *@brief Limpiar banderas de exportacion para no afectar a la siguiente exportacion
 void limpiar_banderas_exportacion() {
     exportar = false;
     contenido_por_default = false;
@@ -203,17 +234,12 @@ void filtrar_trafico(int i) {
     }
 }
 
-// =======================================================================================================================================
-//                                                      PANTALLA 2: ANÁLISIS DE TRÁFICO
-// =======================================================================================================================================
 
- 
- 
-// @brief Dibuja la pantalla de análisis de tráfico, mostrando la lista de paquetes capturados y detalles del paquete seleccionado
-void mostrar_pantalla_analisis() {
-
-    // --- BARRA DE HERRAMIENTAS SUPERIOR ---
-    
+// @brief Dibuja el botón para volver a la pantalla de selección de interfaz, deteniendo la 
+// captura de paquetes si aún está activa y limpiando la lista de paquetes capturados para 
+// evitar mostrar tráfico antiguo al volver a iniciar una nueva captura desde la pantalla de 
+// selección de interfaz 
+void mostrar_btn_volver_interfaces () {
     if (ImGui::Button("Volver a Interfaces")) {
         // Ocultar vista de análisis y volver al menu de interfaces 
         if (capturando) {
@@ -230,16 +256,21 @@ void mostrar_pantalla_analisis() {
             id_paquete = 0;
         }
 
+		// Limpiar filtros de captura para no afectar la próxima captura
+        if (!capturando) { filtro_captura[0] = '\0'; }
+        if (!capturando) { filtro_antes_captura[0] = '\0'; }
+
         vista_analisis = false;
     }
 
-	ImGui::SameLine();
-    cambiar_tema_obscuro();
+}
 
-    ImGui::SameLine();
-	cambiar_tema_claro();
-
-    ImGui::Separator();
+/*
+@brief Dibuja el botón para detener la captura de paquetes, deteniendo la captura si aún está 
+activa y permitiendo al usuario analizar el tráfico capturado hasta el momento sin cerrar la 
+sesión de análisis de tráfico ni volver a la pantalla de selección de interfaz
+*/ 
+void mostrar_btn_detener() {
     if (ImGui::Button("Detener")) {
         if (capturando) {
             capturando = false;
@@ -248,53 +279,78 @@ void mostrar_pantalla_analisis() {
             if (capdev != nullptr) { pcap_close(capdev); capdev = nullptr; }
         }
     }
+}
 
-
-    ImGui::SameLine();
+/*
+@brief Dibuja el botón para reiniciar la captura, deteniendo la captura si aún está activa y 
+limpiando la lista de paquetes capturados para empezar una nueva sesión de captura sin tener 
+que volver a la pantalla de selección de interfaz
+*/
+void reinciar_Captura() {
     if (ImGui::Button("Reiniciar captura")) {
         if (!capturando) {
-
+            if (abrir_y_configurar_interfaz()) {
+                {
+                    lock_guard<mutex> lock(mutex_paquetes); // Asegurar que no haya acceso concurrente a la lista de paquetes
+                    paquetes_capturados.clear();
+                    id_paquete = 0;
+                }
+                capturando = true;
+                hilo_de_captura = thread(captura_de_paquetes);
+            }
         }
+    }
+}
+
+/*
+@brief Maneja la lógica de activación y desactivación de filtros de captura, 
+aplicando el filtro escrito por el usuario en la interfaz gráfica para mostrar 
+solo los paquetes que coincidan con el filtro aplicado, o mostrando todo el 
+tráfico si no hay ningún filtro aplicado
+*/ 
+void manejar_filtros_en_captura() {
+    if (!filtro_activo && strlen(filtro_captura) > 0) {
+        filtro_activo = true;
+    }
+    else if (filtro_activo && strlen(filtro_captura) == 0) {
+        filtro_activo = false;
     }
 
     ImGui::SameLine();
-    ImGui::Text(" | Filtro:"); ImGui::SameLine();
-    ImGui::InputText("##Filtro", filtro_captura, IM_ARRAYSIZE(filtro_captura));
 
-	if (!filtro_activo && strlen(filtro_captura) > 0) {
-		filtro_activo = true;
-	}
-	else if (filtro_activo && strlen(filtro_captura) == 0) {
-		filtro_activo = false;
-	}
-
-    ImGui::SameLine();
-    static bool filtro_activo_en_captura = false;
     if (ImGui::Button("Quitar Filtro")) {
-            filtro_captura[0] = '\0'; // Limpiar el filtro
-            filtro_aplicado = "";
-            filtro_activo_en_captura = false;
-			coincide = true; // Mostrar todo el tráfico nuevamente
+        filtro_captura[0] = '\0'; // Limpiar el filtro
+        filtro_aplicado = "";
+        filtro_activo_en_captura = false;
+        coincide = true; // Mostrar todo el tráfico nuevamente
     }
 
     ImGui::SameLine();
     if (ImGui::Button("Aplicar Filtro")) {
         filtro_aplicado = string(filtro_captura);
         filtro_activo_en_captura = true;
-    }    
-
-    ImGui::Separator();
+    }
+}
+ 
+/*
+@brief Maneja la lógica de exportación de tráfico a CSV, permitiendo al usuario elegir 
+entre exportar todo el tráfico con un formato por default, personalizar el contenido a 
+exportar seleccionando las columnas que desea incluir en el CSV, o exportar solo el 
+tráfico que coincida con el filtro aplicado en la captura, y luego capturar el nombre 
+del archivo a exportar y generar el archivo CSV con el contenido seleccionado por el usuario
+*/
+void manejar_exportacion() {
     static char nombre_archivo[256] = "";
     if (ImGui::Button("Exportar")) {
         if (!capturando) {
-			exportar = true;
+            exportar = true;
         }
     }
 
-    if (exportar) { 
+    if (exportar) {
 
         // Contendio de la ventana emergente 
-		if (!exportacion_seleccionada) {
+        if (!exportacion_seleccionada) {
             ImGui::OpenPopup("Configurar exportacion");
             if (ImGui::BeginPopupModal("Configurar exportacion", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 
@@ -326,14 +382,14 @@ void mostrar_pantalla_analisis() {
                 }
 
                 if (ImGui::Selectable(">> Cancelar")) {
-					limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
+                    limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
                     exportar = false;
                     ImGui::CloseCurrentPopup();
                 }
 
                 ImGui::EndPopup();
             }
-		}
+        }
 
         if (personalizar) {
             ImGui::OpenPopup("Personalizar");
@@ -350,48 +406,48 @@ void mostrar_pantalla_analisis() {
                 ImGui::Checkbox("Tiempo Epoch", &tiempo_epoch_columna); ImGui::Separator();
                 if (ImGui::Button("OK")) {
                     personalizar = false;
-					if (!no_columna && !protocolo_columna && !origen_columna && !destino_columna && !puerto_origen_columna 
-                        && !puerto_destino_columna && !longitud_columna && !tiempo_local_columna && !tiempo_utc_columna 
+                    if (!no_columna && !protocolo_columna && !origen_columna && !destino_columna && !puerto_origen_columna
+                        && !puerto_destino_columna && !longitud_columna && !tiempo_local_columna && !tiempo_utc_columna
                         && !tiempo_epoch_columna) {
-						// Si el usuario no selecciona ninguna columna, se cancela la exportación para evitar crear un CSV sin datos
-						exportar = false;
-						limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
-                       
-					}
-                    
+                        // Si el usuario no selecciona ninguna columna, se cancela la exportación para evitar crear un CSV sin datos
+                        exportar = false;
+                        limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
+
+                    }
+
                     ImGui::CloseCurrentPopup();
-                    
+
                 }
                 if (ImGui::Button("Cancelar")) {
 
-					limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
+                    limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
                     exportar = false;
                     ImGui::CloseCurrentPopup();
                 }
                 ImGui::EndPopup();
             }
         }
-       
-		// Capturar nombre del archivo a exportar
+
+        // Capturar nombre del archivo a exportar
         char extension_archivo[10] = ".csv";
-		char carpeta_exportacion[500] = "exportaciones_csv/";
+        char carpeta_exportacion[500] = "exportaciones_csv/";
         ImGui::SameLine();
         ImGui::Text(" | Nombre archivo: "); ImGui::SameLine();
         ImGui::InputText("##NombreArchivo", nombre_archivo, IM_ARRAYSIZE(nombre_archivo));
-        ImGui::SameLine();     
+        ImGui::SameLine();
 
 
         if (ImGui::Button("Guardar CSV")) {
-            
-			if (strlen(nombre_archivo) == 0) {
-				nombre_csv_vacio = true;
+
+            if (strlen(nombre_archivo) == 0) {
+                nombre_csv_vacio = true;
                 ImGui::OpenPopup("Nombre de archivo requerido");
-			}
-			else {
-				nombre_csv_vacio = false;
+            }
+            else {
+                nombre_csv_vacio = false;
 
                 if (!fs::exists(carpeta_exportacion)) {
-					fs::create_directory(carpeta_exportacion);
+                    fs::create_directory(carpeta_exportacion);
                 }
 
                 strcat_s(nombre_archivo, extension_archivo);      // Añadir extensión al nombre ingresado por el usuario
@@ -512,13 +568,13 @@ void mostrar_pantalla_analisis() {
                     cerr << "ERR: No se pudo crear el archivo CSV.\n";
                 }
 
-			}
+            }
         }
 
-		ImGui::SameLine();
+        ImGui::SameLine();
         if (ImGui::Button("Cancelar exportacion")) {
             exportar = false;
-			limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
+            limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
         }
     }
 
@@ -543,29 +599,23 @@ void mostrar_pantalla_analisis() {
             ImGui::TextUnformatted("Trafico exportado exitosamente al CSV");
             ImGui::Spacing();
             if (ImGui::Button("OK", ImVec2(80.0f, 30.0f))) {
-				limpiar_banderas_exportacion(); // Limpiar banderas de exportación para la próxima vez
-				exportacion_exitosa = false;
+                limpiar_banderas_exportacion(); // Limpiar banderas de exportación para la próxima vez
+                exportacion_exitosa = false;
 
-                ImGui::CloseCurrentPopup();              
+                ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
         }
 
 
     }
+}
 
-
-    ImGui::Separator();
-
-    // Calcular el espacio disponible
-    float ancho_total = ImGui::GetContentRegionAvail().x;
-    float alto_total = ImGui::GetContentRegionAvail().y;
-
-    // --- ÁREA 1: TRÁFICO CAPTURADO (Lista de Paquetes) ---
+// @brief Dibuja el área de la tabla que muestra el tráfico capturado, aplicando el filtro de captura 
+// si está activo para mostrar solo los paquetes que coincidan con el filtro aplicado, y permitiendo 
+// al usuario seleccionar un paquete para mostrar su información detallada en el área de información estructurada
+void mostrar_area_1(float ancho_total, float alto_total) {
     ImGui::BeginChild("Area1", ImVec2(ancho_total, alto_total * 0.55f), true);
-
-    // Variable para recordar qué paquete (fila) seleccionó el usuario
-    static int indice_paquete_seleccionado = -1;
 
     // Configurar el diseño  de la tabla
     static ImGuiTableFlags banderas_tabla =
@@ -585,20 +635,20 @@ void mostrar_pantalla_analisis() {
         ImGui::TableSetupColumn("Longitud", ImGuiTableColumnFlags_WidthFixed, 70.0f);
         ImGui::TableHeadersRow();
 
-        bool scroll_fondo = (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() );
+        bool scroll_fondo = (ImGui::GetScrollY() >= ImGui::GetScrollMaxY());
 
         // Recorrer el  vector global para dibujar cada paquete capturado
         {
             lock_guard<mutex> lock(mutex_paquetes); // Aseguramos que no haya acceso concurrente a la lista de paquetes
 
             for (int i = 0; i < paquetes_capturados.size(); i++) {
-				filtrar_trafico(i); 
+                filtrar_trafico(i);
                 // Si el paquete no cumple con el filtro, saltar a la siguiente iteración sin dibujarlo
                 if (!coincide) continue;
 
                 ImGui::TableNextRow();
 
-				ImGui::PushID(i); // Usar el índice como ID para evitar conflictos en la tabla
+                ImGui::PushID(i); // Usar el índice como ID para evitar conflictos en la tabla
 
                 // Verificamos si esta es la fila a la que el usuario le dio clic
                 bool esta_seleccionado = (indice_paquete_seleccionado == i);
@@ -630,21 +680,18 @@ void mostrar_pantalla_analisis() {
 
                 // Columna 5: Longitud
                 ImGui::TableSetColumnIndex(5);
-				string long_paquete = to_string(paquetes_capturados[i].longitud_paquete) + " bytes";
+                string long_paquete = to_string(paquetes_capturados[i].longitud_paquete) + " bytes";
                 ImGui::TextUnformatted(long_paquete.c_str());
 
-				ImGui::PopID();
+                ImGui::PopID();
             }
         }
         if (scroll_fondo) { ImGui::SetScrollHereY(1.0f); }
-        
+
         ImGui::EndTable();
     }
     ImGui::EndChild();
 
-    // Hacer una copia segura del paquete seleccionado para no mantener el candado cerrado mucho tiempo
-    bool hay_seleccion = false;
-    Datos_Paquete paquete_actual;
 
     {
         lock_guard<mutex> lock(mutex_paquetes);
@@ -654,7 +701,9 @@ void mostrar_pantalla_analisis() {
         }
     }
 
-    // --- ÁREA 2: INFORMACIÓN ESTRUCTURADA ---
+}
+
+void mostrar_area_2(float ancho_total) {
     ImGui::BeginChild("Area2", ImVec2(ancho_total * 0.5f, 0), true);
     ImGui::TextUnformatted("AREA 2: INFORMACION ESTRUCTURADA");
     ImGui::Separator();
@@ -673,9 +722,9 @@ void mostrar_pantalla_analisis() {
             string nombre_interfaz = lista_interfaces_de_red[interfaz_seleccionada].nombre_tecnico;
             string desc_interfaz = lista_interfaces_de_red[interfaz_seleccionada].descripcion;
             string texto_interfaz = "ID de la interfaz: 0 (" + nombre_interfaz;
-            string tiempo_llegada = "Hora de llegada: " + paquete_actual.tiempo_llegada; 
-			string tiempo_llegada_utc = "Hora de llegada UTC: " + paquete_actual.tiempo_llegada_utc;
-			string tiempo_epoch = "Tiempo de llegada Epoch: " + paquete_actual.tiempo_epoch;
+            string tiempo_llegada = "Hora de llegada: " + paquete_actual.tiempo_llegada;
+            string tiempo_llegada_utc = "Hora de llegada UTC: " + paquete_actual.tiempo_llegada_utc;
+            string tiempo_epoch = "Tiempo de llegada Epoch: " + paquete_actual.tiempo_epoch;
             string texto_no_paquete = "No. paquete: " + to_string(indice_paquete_seleccionado + 1);
             string texto_longitud_paquete = "Longitud paquete: " + to_string(paquete_actual.longitud_paquete) + "bytes ("
                 + to_string(tam_bits_cable) + " bits)";
@@ -691,33 +740,33 @@ void mostrar_pantalla_analisis() {
                 ImGui::TreePop();
             }
             ImGui::TextUnformatted(tiempo_llegada.c_str());
-			ImGui::TextUnformatted(tiempo_llegada_utc.c_str());
-			ImGui::TextUnformatted(tiempo_epoch.c_str());
+            ImGui::TextUnformatted(tiempo_llegada_utc.c_str());
+            ImGui::TextUnformatted(tiempo_epoch.c_str());
             ImGui::TextUnformatted(texto_no_paquete.c_str());
             ImGui::TextUnformatted(texto_longitud_paquete.c_str());
             ImGui::TextUnformatted(texto_longitud_capturada.c_str());
             ImGui::TreePop();
         }
-        
+
         //Armar nodo de Ethernet II
-		string titulo_ethernet = "Ethernet II, Origen: " + paquete_actual.src_ip 
+        string titulo_ethernet = "Ethernet II, Origen: " + paquete_actual.src_ip
             + " Destino: " + paquete_actual.dest_ip;
         if (ImGui::TreeNode(titulo_ethernet.c_str())) {
-			string txt_dst = "Destino: " + paquete_actual.dest_ip;
-			string txt_src = "Origen: " + paquete_actual.src_ip;
+            string txt_dst = "Destino: " + paquete_actual.dest_ip;
+            string txt_src = "Origen: " + paquete_actual.src_ip;
 
-			ImGui::TextUnformatted(txt_dst.c_str());
-			ImGui::TextUnformatted(txt_src.c_str());
+            ImGui::TextUnformatted(txt_dst.c_str());
+            ImGui::TextUnformatted(txt_src.c_str());
 
             // Tipo 
             if (paquete_actual.protocolo == "ARP") {
-                ImGui::TextUnformatted("Tipo: ARP (0x0806)");
+                ImGui::TextUnformatted("Tipo de protocolo: ARP (0x0806)");
             }
             else if (paquete_actual.protocolo == "IPv6" || paquete_actual.protocolo == "ICMPv6") {
-                ImGui::TextUnformatted("Tipo: IPv6 (0x86DD)");
+                ImGui::TextUnformatted("Tipo de protcolo: IPv6 (0x86DD)");
             }
             else {
-                ImGui::TextUnformatted("Tipo: IPv4 (0x0800)");
+                ImGui::TextUnformatted("Tipo de protocolo: IPv4 (0x0800)");
             }
 
             ImGui::TreePop();
@@ -749,12 +798,12 @@ void mostrar_pantalla_analisis() {
         if (paquete_actual.protocolo == "ARP") {
             if (ImGui::TreeNode("Address Resolution Protocol (ARP)")) {
                 ImGui::TextUnformatted("Hardware type: Ethernet (1)");
-                ImGui::TextUnformatted("Protocol type: IPv4 (0x0800)");
+                ImGui::TextUnformatted("Tipo de protcolo: IPv4 (0x0800)");
                 ImGui::TextUnformatted("Hardware size: 6");
                 ImGui::TextUnformatted("Protocol size: 4");
 
-                ImGui::TextUnformatted(("Sender MAC address: " + paquete_actual.src_ip).c_str());
-                ImGui::TextUnformatted(("Target MAC address: " + paquete_actual.dest_ip).c_str());
+                ImGui::TextUnformatted(("Direccion MAC origen: " + paquete_actual.src_ip).c_str());
+                ImGui::TextUnformatted(("Direccion MAC destino: " + paquete_actual.dest_ip).c_str());
 
                 ImGui::TreePop();
             }
@@ -765,10 +814,9 @@ void mostrar_pantalla_analisis() {
     }
     ImGui::EndChild();
 
+}
 
-    ImGui::SameLine(); // Poner el Área 3 justo al lado del Área 2
-
-    // --- ÁREA 3: CONTENIDO RAW (Hexadecimal y ASCII ) ---
+void mostrar_area_3() {
     ImGui::BeginChild("Area3", ImVec2(0, 0), true);
     ImGui::TextUnformatted("AREA 3: CONTENIDO RAW DEL PAQUETE");
     ImGui::Separator();
@@ -821,7 +869,7 @@ void mostrar_pantalla_analisis() {
             // --- COLUMNA ASCII ---
             ImGui::SetCursorPosX(offset_ascii);
 
-			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 255, 255)); // Color azul cian para el texto ASCII
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 255, 255)); // Color azul cian para el texto ASCII
             for (size_t j = 0; j < 16; j++) {
                 if (i + j < paquete_actual.raw_data.size()) {
                     unsigned char byte = paquete_actual.raw_data[i + j];
@@ -844,7 +892,7 @@ void mostrar_pantalla_analisis() {
                 }
                 ImGui::SameLine(0, 0);
             }
-			ImGui::PopStyleColor();
+            ImGui::PopStyleColor();
             ImGui::NewLine();
         }
 
@@ -859,7 +907,52 @@ void mostrar_pantalla_analisis() {
     }
 
     ImGui::EndChild();
+}
 
+// @brief Dibuja la pantalla de análisis de tráfico, mostrando la lista de paquetes capturados y detalles del paquete seleccionado
+void mostrar_pantalla_analisis() {
+
+    // --- BARRA DE HERRAMIENTAS SUPERIOR ---
+	mostrar_btn_volver_interfaces();
+
+	ImGui::SameLine();
+    cambiar_tema_obscuro();
+
+    ImGui::SameLine();
+	cambiar_tema_claro();
+
+    ImGui::Separator();
+	mostrar_btn_detener();
+
+
+    ImGui::SameLine();
+	reinciar_Captura();
+
+    ImGui::SameLine();
+    ImGui::Text(" | Filtro:"); ImGui::SameLine();
+    ImGui::InputText("##Filtro", filtro_captura, IM_ARRAYSIZE(filtro_captura));
+
+	manejar_filtros_en_captura();
+
+    ImGui::Separator();
+	manejar_exportacion();
+
+    ImGui::Separator();
+
+    // Calcular el espacio disponible
+    float ancho_total = ImGui::GetContentRegionAvail().x;
+    float alto_total = ImGui::GetContentRegionAvail().y;
+
+    // --- ÁREA 1: TRÁFICO CAPTURADO (Lista de Paquetes) ---
+	mostrar_area_1(ancho_total, alto_total);
+
+    // --- ÁREA 2: INFORMACIÓN ESTRUCTURADA ---
+	mostrar_area_2(ancho_total);
+
+    ImGui::SameLine(); // Poner el Área 3 justo al lado del Área 2
+
+    // --- ÁREA 3: CONTENIDO RAW (Hexadecimal y ASCII ) ---
+	mostrar_area_3();
 }
 
 
@@ -875,11 +968,9 @@ void dibujarInterfaz() {
 
     if (!vista_analisis) {
 		mostrar_pantalla_interfaz();
-        if (!capturando) { filtro_captura[0] = '\0'; }
     }
     else {
 		mostrar_pantalla_analisis();
-        if (!capturando) { filtro_antes_captura[0] = '\0'; }
     }
 
     ImGui::End();
