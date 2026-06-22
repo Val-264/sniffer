@@ -125,7 +125,9 @@ void mostrar_pantalla_interfaz() {
 
     // Filtro de captura bpf opcional para que el usuario pueda escribir un filtro antes de iniciar la captura 
     ImGui::Text("Filtro (Puedes configurar un filtro antes de comenzar la captura):");
-    ImGui::SetNextItemWidth(500);
+    float ancho_input = ImGui::GetContentRegionAvail().x * 0.8f;
+    if (ancho_input < 200.0f) ancho_input = 200.0f; // mínimo
+    ImGui::SetNextItemWidth(ancho_input);
     ImGui::InputText("##FiltroBPF", filtro_antes_captura, IM_ARRAYSIZE(filtro_antes_captura));
     ImGui::Spacing();
 
@@ -136,7 +138,9 @@ void mostrar_pantalla_interfaz() {
         string preview_actual = lista_interfaces_de_red[interfaz_seleccionada].descripcion;
         bool hay_seleccion = false;
         // Estandatizar el tamaño de los botones para que se vean uniformes
-        ImVec2 tamanio_boton = ImVec2(450.0f, 30.0f);       
+        float ancho_boton = ImGui::GetContentRegionAvail().x * 0.85f;
+        if (ancho_boton > 500.0f) ancho_boton = 500.0f; // máximo
+        ImVec2 tamanio_boton = ImVec2(ancho_boton, 30.0f);
 		// Alinear el texto de los botones hacia la izquierda y agregar padding para mejorar la apariencia
         ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 6.0f));
@@ -439,7 +443,8 @@ void manejar_exportacion() {
         char extension_archivo[10] = ".csv";
         char carpeta_exportacion[500] = "exportaciones_csv/";
         ImGui::SameLine();
-        ImGui::Text(" | Nombre archivo: "); ImGui::SameLine();
+        ImGui::Text("Nombre archivo:"); ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.4f);
         ImGui::InputText("##NombreArchivo", nombre_archivo, IM_ARRAYSIZE(nombre_archivo));
         ImGui::SameLine();
 
@@ -651,7 +656,8 @@ ImVec4 obtener_color_protocolo(const std::string& protocolo) {
 // si está activo para mostrar solo los paquetes que coincidan con el filtro aplicado, y permitiendo 
 // al usuario seleccionar un paquete para mostrar su información detallada en el área de información estructurada
 void mostrar_area_1(float ancho_total, float alto_total) {
-    ImGui::BeginChild("Area1", ImVec2(ancho_total, alto_total * 0.55f), true);
+    float alto_area1 = alto_total * 0.55f;
+    ImGui::BeginChild("Area1", ImVec2(ancho_total, alto_area1), true);
 
     // Configurar el diseño  de la tabla
     static ImGuiTableFlags banderas_tabla =
@@ -665,11 +671,10 @@ void mostrar_area_1(float ancho_total, float alto_total) {
         // Configurar los títulos y anchos de las columnas
         ImGui::TableSetupColumn("No.", ImGuiTableColumnFlags_WidthFixed, 40.0f);
         ImGui::TableSetupColumn("Protocolo", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-        ImGui::TableSetupColumn("Origen");
-        ImGui::TableSetupColumn("Destino");
-        ImGui::TableSetupColumn("Puertos(src->dest)");
+        ImGui::TableSetupColumn("Origen", ImGuiTableColumnFlags_WidthStretch);      
+        ImGui::TableSetupColumn("Destino", ImGuiTableColumnFlags_WidthStretch);     
+        ImGui::TableSetupColumn("Puertos(src->dest)", ImGuiTableColumnFlags_WidthFixed, 130.0f);
         ImGui::TableSetupColumn("Longitud", ImGuiTableColumnFlags_WidthFixed, 70.0f);
-        ImGui::TableHeadersRow();
 
         bool scroll_fondo = (ImGui::GetScrollY() >= ImGui::GetScrollMaxY());
 
@@ -744,7 +749,7 @@ void mostrar_area_1(float ancho_total, float alto_total) {
 }
 
 void mostrar_area_2(float ancho_total) {
-    ImGui::BeginChild("Area2", ImVec2(ancho_total * 0.5f, 0), true);
+    ImGui::BeginChild("Area2", ImVec2(ancho_total * 0.5f, -1), true);
     ImGui::TextUnformatted("AREA 2: INFORMACION ESTRUCTURADA");
     ImGui::Separator();
 
@@ -857,7 +862,7 @@ void mostrar_area_2(float ancho_total) {
 }
 
 void mostrar_area_3() {
-    ImGui::BeginChild("Area3", ImVec2(0, 0), true);
+    ImGui::BeginChild("Area3", ImVec2(0, -1), true);
     ImGui::TextUnformatted("AREA 3: CONTENIDO RAW DEL PAQUETE");
     ImGui::Separator();
 
@@ -973,6 +978,9 @@ void mostrar_pantalla_analisis() {
 
     ImGui::SameLine();
     ImGui::Text(" | Filtro:"); ImGui::SameLine();
+    float ancho_filtro = ImGui::GetContentRegionAvail().x * 0.3f;
+    if (ancho_filtro < 150.0f) ancho_filtro = 150.0f;
+    ImGui::SetNextItemWidth(ancho_filtro);
     ImGui::InputText("##Filtro", filtro_captura, IM_ARRAYSIZE(filtro_captura));
 
 	manejar_filtros_en_captura();
@@ -1003,17 +1011,30 @@ void mostrar_pantalla_analisis() {
 * @brief Dibuja la interfaz gráfica utilizando ImGui. Controla dos vistas: selección de interfaz y análisis de tráfico.
 */
 void dibujarInterfaz() {
-    // Dimensiones inciales de la ventana 
-    ImGui::SetNextWindowSize(ImVec2(1000, 700), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Sniffer de Red", nullptr, ImGuiWindowFlags_NoCollapse);
+    // Obtener el tamaño de la ventana GLFW
+    int ancho_ventana, alto_ventana;
+    GLFWwindow* ventana_actual = glfwGetCurrentContext();
+    glfwGetWindowSize(ventana_actual, &ancho_ventana, &alto_ventana);
 
-	establecer_estilo_general();
+    // Posicionar y dimensionar la ventana principal de ImGui
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImVec2((float)ancho_ventana, (float)alto_ventana));
+
+    ImGuiWindowFlags flags_ventana = ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+    ImGui::Begin("Sniffer de Red", nullptr, flags_ventana);
+
+    establecer_estilo_general();
 
     if (!vista_analisis) {
-		mostrar_pantalla_interfaz();
+        mostrar_pantalla_interfaz();
     }
     else {
-		mostrar_pantalla_analisis();
+        mostrar_pantalla_analisis();
     }
 
     ImGui::End();
