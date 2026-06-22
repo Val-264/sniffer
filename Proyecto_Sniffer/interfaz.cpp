@@ -482,6 +482,8 @@ del archivo a exportar y generar el archivo CSV con el contenido seleccionado po
 */
 void manejar_exportacion() {
     static char nombre_archivo[256] = "";
+    static char carpeta_exportacion[500] = "";
+
     if (ImGui::Button("Exportar")) {
         if (!capturando) {
             exportar = true;
@@ -490,7 +492,7 @@ void manejar_exportacion() {
 
     if (exportar) {
 
-        // Contendio de la ventana emergente 
+        // Contenido de la ventana emergente 
         if (!exportacion_seleccionada) {
             ImGui::OpenPopup("Configurar exportacion");
             if (ImGui::BeginPopupModal("Configurar exportacion", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -528,7 +530,6 @@ void manejar_exportacion() {
                     exportacion_seleccionada = true;
                     personalizar = true;
 
-
                     ImGui::CloseCurrentPopup();
                 }
                 if (filtro_activo_en_captura) {
@@ -542,7 +543,7 @@ void manejar_exportacion() {
                 }
 
                 if (ImGui::Selectable(">> Cancelar")) {
-                    limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
+                    limpiar_banderas_exportacion();
                     exportar = false;
                     ImGui::CloseCurrentPopup();
                 }
@@ -569,10 +570,8 @@ void manejar_exportacion() {
                     if (!no_columna && !protocolo_columna && !origen_columna && !destino_columna && !puerto_origen_columna
                         && !puerto_destino_columna && !longitud_columna && !tiempo_local_columna && !tiempo_utc_columna
                         && !tiempo_epoch_columna) {
-                        // Si el usuario no selecciona ninguna columna, se cancela la exportación para evitar crear un CSV sin datos
                         exportar = false;
-                        limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
-
+                        limpiar_banderas_exportacion();
                     }
 
                     ImGui::CloseCurrentPopup();
@@ -580,7 +579,7 @@ void manejar_exportacion() {
                 }
                 if (ImGui::Button("Cancelar")) {
 
-                    limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
+                    limpiar_banderas_exportacion();
                     exportar = false;
                     ImGui::CloseCurrentPopup();
                 }
@@ -588,15 +587,23 @@ void manejar_exportacion() {
             }
         }
 
-        // Capturar nombre del archivo a exportar
-        char extension_archivo[10] = ".csv";
-        char carpeta_exportacion[500] = "exportaciones_csv/";
+        // Configurar carpeta de exportación en Documentos del usuario
+        char ruta_documentos[MAX_PATH] = "";
+        if (SUCCEEDED(SHGetFolderPathA(nullptr, CSIDL_PERSONAL, nullptr, 0, ruta_documentos))) {
+            snprintf(carpeta_exportacion, sizeof(carpeta_exportacion),
+                "%s\\Sniffer_Exportaciones\\", ruta_documentos);
+        }
+        else {
+            strcpy_s(carpeta_exportacion, sizeof(carpeta_exportacion), "exportaciones_csv\\");
+        }
+
+        // Nombre del archivo
         ImGui::SameLine();
         ImGui::Text("Nombre archivo:"); ImGui::SameLine();
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.4f);
         ImGui::InputText("##NombreArchivo", nombre_archivo, IM_ARRAYSIZE(nombre_archivo));
         ImGui::SameLine();
-
+        ImGui::TextDisabled(".csv");
 
         if (ImGui::Button("Guardar CSV")) {
 
@@ -608,20 +615,17 @@ void manejar_exportacion() {
                 nombre_csv_vacio = false;
 
                 if (!fs::exists(carpeta_exportacion)) {
-                    fs::create_directory(carpeta_exportacion);
+                    fs::create_directories(carpeta_exportacion);
                 }
 
-                strcat_s(nombre_archivo, extension_archivo);      // Añadir extensión al nombre ingresado por el usuario
-                strcat_s(carpeta_exportacion, nombre_archivo);
-                ofstream archivo(carpeta_exportacion);
+                string ruta_completa = string(carpeta_exportacion) + nombre_archivo + ".csv";
+                ofstream archivo(ruta_completa);
                 if (archivo.is_open()) {
                     exportar = false;
 
                     if (contenido_por_default) {
-                        // Escribir el encabezado del CSV 
                         archivo << "No.,Protocolo,Origen,Destino,Puerto Origen,Puerto Destino,Longitud (Bytes),Tiempo Local,Tiempo UTC,Tiempo Epoch\n";
 
-                        // Bloquear el vector con el candado para leer los datos de forma segura
                         {
                             lock_guard<mutex> lock(mutex_paquetes);
 
@@ -638,13 +642,10 @@ void manejar_exportacion() {
                                     << pkt.tiempo_epoch << "\n";
                             }
                         }
-
                     }
 
                     if (contenido_filtrado) {
-                        // Escribir el encabezado del CSV 
                         archivo << "No.,Protocolo,Origen,Destino,Puerto Origen,Puerto Destino,Longitud (Bytes),Tiempo Local,Tiempo UTC,Tiempo Epoch\n";
-                        // Bloquear el vector con el candado para leer los datos de forma segura
                         {
                             lock_guard<mutex> lock(mutex_paquetes);
                             for (size_t i = 0; i < paquetes_capturados.size(); i++) {
@@ -668,7 +669,6 @@ void manejar_exportacion() {
 
                     if (contenido_personalizado) {
 
-                        // Formar encabezado de CVS dependiendo de la selección del usuario
                         if (no_columna) archivo << "No.,";
                         if (protocolo_columna) archivo << "Protocolo,";
                         if (origen_columna) archivo << "Origen,";
@@ -684,7 +684,7 @@ void manejar_exportacion() {
                         {
                             lock_guard<mutex> lock(mutex_paquetes);
                             for (const auto& pkt : paquetes_capturados) {
-                                filtrar_trafico(pkt.id - 1); // El ID del paquete es su posición en la lista + 1, entonces para obtener la posición correcta restamos 1
+                                filtrar_trafico(pkt.id - 1);
                                 if (coincide) {
                                     if (no_columna) archivo << pkt.id << ",";
                                     if (protocolo_columna) archivo << pkt.protocolo << ",";
@@ -699,18 +699,13 @@ void manejar_exportacion() {
                                     archivo << "\n";
                                 }
                             }
-
                         }
-
                     }
 
                     archivo.close();
-                    nombre_archivo[0] = '\0'; // Limpiar el nombre del archivo para la próxima exportación
-
+                    nombre_archivo[0] = '\0';
                     exportacion_exitosa = true;
-
-                    cout << "Exportacion exitosa archivo creado";
-
+                    cout << "Exportacion exitosa. Archivo creado en: " << ruta_completa << "\n";
                 }
                 else {
                     ImGui::OpenPopup("Fallo al exportar");
@@ -718,40 +713,34 @@ void manejar_exportacion() {
                         ImGui::TextUnformatted("No se pudo crear el archivo CSV");
                         ImGui::Spacing();
                         if (ImGui::Button("OK", ImVec2(80.0f, 30.0f))) {
-                            // Limpiar banderas de exportación para la próxima vez
                             limpiar_banderas_exportacion();
-
                             ImGui::CloseCurrentPopup();
                         }
                         ImGui::EndPopup();
                     }
-
                     cerr << "ERR: No se pudo crear el archivo CSV.\n";
                 }
-
             }
         }
 
         ImGui::SameLine();
         if (ImGui::Button("Cancelar exportacion")) {
             exportar = false;
-            limpiar_banderas_exportacion(); // Limpiar banderas de exportación para no afectar a la próxima exportación
+            limpiar_banderas_exportacion();
         }
     }
 
     if (nombre_csv_vacio) {
-        // Si el usuario no ingresa un nombre de archivo, se muestra un error y no se procede con la exportación
         ImGui::OpenPopup("Nombre de archivo requerido");
         if (ImGui::BeginPopupModal("Nombre de archivo requerido", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::TextUnformatted("Por favor ingresa un nombre para el archivo CSV.");
             ImGui::Spacing();
             if (ImGui::Button("OK", ImVec2(80.0f, 30.0f))) {
-                nombre_csv_vacio = false; // Reiniciar bandera para la próxima vez
+                nombre_csv_vacio = false;
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
         }
-
     }
 
     if (exportacion_exitosa) {
@@ -760,15 +749,12 @@ void manejar_exportacion() {
             ImGui::TextUnformatted("Trafico exportado exitosamente al CSV");
             ImGui::Spacing();
             if (ImGui::Button("OK", ImVec2(80.0f, 30.0f))) {
-                limpiar_banderas_exportacion(); // Limpiar banderas de exportación para la próxima vez
+                limpiar_banderas_exportacion();
                 exportacion_exitosa = false;
-
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
         }
-
-
     }
 }
 
