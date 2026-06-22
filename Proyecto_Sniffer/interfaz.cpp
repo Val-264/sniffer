@@ -458,6 +458,25 @@ void manejar_exportacion() {
                     exportacion_seleccionada = true;
                     ImGui::CloseCurrentPopup();
                 }
+                // Tooltip para "Contenido por default"
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("Exporta todas las columnas:");
+                    ImGui::Separator();
+                    ImGui::BulletText("No.");
+                    ImGui::BulletText("Protocolo");
+                    ImGui::BulletText("Origen (IP/MAC)");
+                    ImGui::BulletText("Destino (IP/MAC)");
+                    ImGui::BulletText("Puerto Origen");
+                    ImGui::BulletText("Puerto Destino");
+                    ImGui::BulletText("Longitud (Bytes)");
+                    ImGui::BulletText("Tiempo Local");
+                    ImGui::BulletText("Tiempo UTC");
+                    ImGui::BulletText("Tiempo Epoch");
+                    ImGui::Separator();
+                    ImGui::Text("Incluye todos los paquetes capturados.");
+                    ImGui::EndTooltip();
+                }
                 if (ImGui::Selectable(">> Contenido personalizado")) {
                     contenido_por_default = false;
                     contenido_personalizado = true;
