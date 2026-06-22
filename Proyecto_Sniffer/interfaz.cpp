@@ -201,45 +201,131 @@ void limpiar_banderas_exportacion() {
 * @param i Índice del paquete en el vector global de paquetes capturados que se está evaluando para mostrar en la tabla de análisis de tráfico
 */
 void filtrar_trafico(int i) {
-    if (!filtro_aplicado.empty()) {
+    // Si no hay filtro, mostrar todo
+    if (filtro_aplicado.empty()) {
+        coincide = true;
+        return;
+    }
+
+    // Copia del filtro en minúsculas
+    string filtro = filtro_aplicado;
+    for (auto& c : filtro) c = tolower(c);
+
+    // Datos del paquete
+    string prot = paquetes_capturados[i].protocolo;
+    for (auto& c : prot) c = tolower(c);
+
+    string ip_src = paquetes_capturados[i].src_ip;
+    string ip_dst = paquetes_capturados[i].dest_ip;
+    string p_src = to_string(paquetes_capturados[i].src_port);
+    string p_dst = to_string(paquetes_capturados[i].dest_port);
+
+    // MAC en minúsculas (para comparar sin sensibilidad)
+    string mac_src = ip_src;
+    for (auto& c : mac_src) c = tolower(c);
+    string mac_dst = ip_dst;
+    for (auto& c : mac_dst) c = tolower(c);
+
+    // Buscar operador ==
+    size_t pos_eq = filtro.find("==");
+
+    if (pos_eq != string::npos) {
+        // --- Formato: clave == valor ---
+        string clave = filtro.substr(0, pos_eq);
+        string valor = filtro.substr(pos_eq + 2);
+
+        // Trim de clave y valor
+        auto trim = [](string& s) {
+            s.erase(0, s.find_first_not_of(" \t"));
+            s.erase(s.find_last_not_of(" \t") + 1);
+            };
+        trim(clave);
+        trim(valor);
+
+        // Valor en minúsculas para comparaciones de texto
+        string valor_lower = valor;
+        for (auto& c : valor_lower) c = tolower(c);
+
+        // --- IP fuente (coincidencia exacta) ---
+        if (clave == "ip.src") {
+            coincide = (ip_src == valor);
+            return;
+        }
+
+        // --- IP destino (coincidencia exacta) ---
+        if (clave == "ip.dst") {
+            coincide = (ip_dst == valor);
+            return;
+        }
+
+        // --- MAC fuente (coincidencia exacta, sin sensibilidad a mayúsculas) ---
+        if (clave == "mac.src") {
+            coincide = (mac_src == valor_lower);
+            return;
+        }
+
+        // --- MAC destino ---
+        if (clave == "mac.dst") {
+            coincide = (mac_dst == valor_lower);
+            return;
+        }
+
+        // --- Puerto TCP origen ---
+        if (clave == "tcp.srcport") {
+            coincide = (p_src == valor);
+            return;
+        }
+
+        // --- Puerto TCP destino ---
+        if (clave == "tcp.dstport") {
+            coincide = (p_dst == valor);
+            return;
+        }
+
+        // --- Puerto UDP origen ---
+        if (clave == "udp.srcport") {
+            coincide = (p_src == valor);
+            return;
+        }
+
+        // --- Puerto UDP destino ---
+        if (clave == "udp.dstport") {
+            coincide = (p_dst == valor);
+            return;
+        }
+
+        // --- Puerto TCP (origen o destino) ---
+        if (clave == "tcp.port") {
+            coincide = (p_src == valor || p_dst == valor);
+            return;
+        }
+
+        // --- Puerto UDP (origen o destino) ---
+        if (clave == "udp.port") {
+            coincide = (p_src == valor || p_dst == valor);
+            return;
+        }
+
+        // --- Protocolo (estructurado) ---
+        if (clave == "protocolo") {
+            coincide = (prot == valor_lower);
+            return;
+        }
+
+        // Clave no reconocida
         coincide = false;
+        return;
+    }
+    else {
+        // --- Formato: solo nombre de protocolo ---
+        auto trim = [](string& s) {
+            s.erase(0, s.find_first_not_of(" \t"));
+            s.erase(s.find_last_not_of(" \t") + 1);
+            };
+        trim(filtro);
 
-        // Copiamos el filtro y lo pasamos a minúsculas
-        string filtro = filtro_aplicado;
-        for (auto& c : filtro) c = tolower(c);
-
-        string prot = paquetes_capturados[i].protocolo;
-        for (auto& c : prot) c = tolower(c);
-
-        string ip_src = paquetes_capturados[i].src_ip;
-        string ip_dst = paquetes_capturados[i].dest_ip;
-        string p_src = to_string(paquetes_capturados[i].src_port);
-        string p_dst = to_string(paquetes_capturados[i].dest_port);
-
-        size_t pos_eq = filtro.find("==");
-
-        if (pos_eq != string::npos) {
-            string clave = filtro.substr(0, pos_eq);
-            string valor = filtro.substr(pos_eq + 2);
-
-            clave.erase(0, clave.find_first_not_of(" \t"));
-            clave.erase(clave.find_last_not_of(" \t") + 1);
-            valor.erase(0, valor.find_first_not_of(" \t"));
-            valor.erase(valor.find_last_not_of(" \t") + 1);
-
-            if (clave == "ip.src" && ip_src.find(valor) != string::npos) coincide = true;
-            else if (clave == "ip.dst" && ip_dst.find(valor) != string::npos) coincide = true;
-            else if ((clave == "tcp.srcport" || clave == "udp.srcport") && p_src == valor) coincide = true;
-            else if ((clave == "tcp.dstport" || clave == "udp.dstport") && p_dst == valor) coincide = true;
-            else if ((clave == "tcp.port" || clave == "udp.port") && (p_src == valor || p_dst == valor)) coincide = true;
-        }
-        else {
-            filtro.erase(0, filtro.find_first_not_of(" \t"));
-            filtro.erase(filtro.find_last_not_of(" \t") + 1);
-
-            // Si escriben solo el protocolo 
-            if (prot == filtro) coincide = true;
-        }
+        coincide = (prot == filtro);
+        return;
     }
 }
 
@@ -982,6 +1068,28 @@ void mostrar_pantalla_analisis() {
     if (ancho_filtro < 150.0f) ancho_filtro = 150.0f;
     ImGui::SetNextItemWidth(ancho_filtro);
     ImGui::InputText("##Filtro", filtro_captura, IM_ARRAYSIZE(filtro_captura));
+
+    // Tooltip de ayuda
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::Text("Formatos aceptados:");
+        ImGui::Separator();
+        ImGui::Text("Solo protocolo: HTTP, DNS, TCP, UDP, ARP, SSH...");
+        ImGui::Separator();
+        ImGui::Text("Clave == valor:");
+        ImGui::BulletText("ip.src == 192.168.1.5");
+        ImGui::BulletText("ip.dst == 10.0.0.1");
+        ImGui::BulletText("mac.src == aa:bb:cc:dd:ee:ff");
+        ImGui::BulletText("mac.dst == 11:22:33:44:55:66");
+        ImGui::BulletText("tcp.srcport == 443");
+        ImGui::BulletText("tcp.dstport == 80");
+        ImGui::BulletText("udp.srcport == 53");
+        ImGui::BulletText("udp.dstport == 67");
+        ImGui::BulletText("tcp.port == 22");
+        ImGui::BulletText("udp.port == 53");
+        ImGui::BulletText("protocolo == TCP");
+        ImGui::EndTooltip();
+    }
 
 	manejar_filtros_en_captura();
 
