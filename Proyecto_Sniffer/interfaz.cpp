@@ -683,9 +683,10 @@ void manejar_exportacion() {
 
                         {
                             lock_guard<mutex> lock(mutex_paquetes);
-                            for (const auto& pkt : paquetes_capturados) {
-                                filtrar_trafico(pkt.id - 1);
+                            for (size_t i = 0; i < paquetes_capturados.size(); i++) {
+                                filtrar_trafico(i);
                                 if (coincide) {
+                                    const auto& pkt = paquetes_capturados[i];
                                     if (no_columna) archivo << pkt.id << ",";
                                     if (protocolo_columna) archivo << pkt.protocolo << ",";
                                     if (origen_columna) archivo << pkt.src_ip << ",";
@@ -766,25 +767,25 @@ ImVec4 obtener_color_protocolo(const std::string& protocolo) {
     float alpha = (tema_obscuro) ? 0.50f : 0.25f; 
 
     if (protocolo == "HTTP" || protocolo == "HTTPS")
-        return ImVec4(0.20f, 0.55f, 0.95f, 0.25f); // Azul suave
+        return ImVec4(0.20f, 0.55f, 0.95f, alpha); // Azul suave
     else if (protocolo == "DNS")
-        return ImVec4(0.95f, 0.75f, 0.15f, 0.25f); // Ámbar suave
+        return ImVec4(0.95f, 0.75f, 0.15f, alpha); // Ámbar suave
     else if (protocolo == "TCP")
-        return ImVec4(0.30f, 0.70f, 0.45f, 0.25f); // Verde suave
+        return ImVec4(0.30f, 0.70f, 0.45f, alpha); // Verde suave
     else if (protocolo == "UDP")
-        return ImVec4(0.60f, 0.50f, 0.85f, 0.25f); // Violeta suave
+        return ImVec4(0.60f, 0.50f, 0.85f, alpha); // Violeta suave
     else if (protocolo == "ICMPv4" || protocolo == "ICMPv6")
-        return ImVec4(0.95f, 0.45f, 0.25f, 0.25f); // Naranja suave
+        return ImVec4(0.95f, 0.45f, 0.25f, alpha); // Naranja suave
     else if (protocolo == "ARP")
-        return ImVec4(0.65f, 0.65f, 0.65f, 0.25f); // Gris medio
+        return ImVec4(0.65f, 0.65f, 0.65f, alpha); // Gris medio
     else if (protocolo == "SSH")
-        return ImVec4(0.25f, 0.75f, 0.80f, 0.25f); // Cian suave
+        return ImVec4(0.25f, 0.75f, 0.80f, alpha); // Cian suave
     else if (protocolo == "DHCP")
-        return ImVec4(0.80f, 0.40f, 0.70f, 0.25f); // Rosa suave
+        return ImVec4(0.80f, 0.40f, 0.70f, alpha); // Rosa suave
     else if (protocolo == "FTP" || protocolo == "Telnet")
-        return ImVec4(0.70f, 0.55f, 0.35f, 0.25f); // Marrón suave
+        return ImVec4(0.70f, 0.55f, 0.35f, alpha); // Marrón suave
     else
-        return ImVec4(0.40f, 0.40f, 0.40f, 0.15f); // Gris neutro para otros
+        return ImVec4(0.40f, 0.40f, 0.40f, alpha); // Gris neutro para otros
 }
 
 // @brief Dibuja el área de la tabla que muestra el tráfico capturado, aplicando el filtro de captura 
@@ -810,6 +811,8 @@ void mostrar_area_1(float ancho_total, float alto_total) {
         ImGui::TableSetupColumn("Destino", ImGuiTableColumnFlags_WidthStretch);     
         ImGui::TableSetupColumn("Puertos(src->dest)", ImGuiTableColumnFlags_WidthFixed, 130.0f);
         ImGui::TableSetupColumn("Longitud", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+
+        ImGui::TableHeadersRow();
 
         bool scroll_fondo = (ImGui::GetScrollY() >= ImGui::GetScrollMaxY());
 
