@@ -1,3 +1,7 @@
+
+// @TODO que el usuario pueda elegir la ruta específica para guardar la exportacion 
+// @TODO mejoras en la interfaz de la interfaz 
+// @TODO Filtros con operadores lógicos
 // Control de la interfaz gráfica 
 
 #include "estructuras.h"
@@ -251,126 +255,119 @@ void filtrar_trafico(int i) {
         return;
     }
 
-    // Copia del filtro en minúsculas
+    // --- Función auxiliar para evaluar una condición simple ---
+    auto evaluar_condicion = [&](const string& condicion) -> bool {
+        string cond = condicion;
+        for (auto& c : cond) c = tolower(c);
+
+        // Datos del paquete
+        string prot = paquetes_capturados[i].protocolo;
+        for (auto& c : prot) c = tolower(c);
+
+        string ip_src = paquetes_capturados[i].src_ip;
+        string ip_dst = paquetes_capturados[i].dest_ip;
+        string p_src = to_string(paquetes_capturados[i].src_port);
+        string p_dst = to_string(paquetes_capturados[i].dest_port);
+
+        string mac_src = ip_src;
+        for (auto& c : mac_src) c = tolower(c);
+        string mac_dst = ip_dst;
+        for (auto& c : mac_dst) c = tolower(c);
+
+        // Trim
+        auto trim = [](string& s) {
+            s.erase(0, s.find_first_not_of(" \t"));
+            s.erase(s.find_last_not_of(" \t") + 1);
+            };
+
+        size_t pos_eq = cond.find("==");
+
+        if (pos_eq != string::npos) {
+            // --- Formato: clave == valor ---
+            string clave = cond.substr(0, pos_eq);
+            string valor = cond.substr(pos_eq + 2);
+            trim(clave);
+            trim(valor);
+
+            string valor_lower = valor;
+            for (auto& c : valor_lower) c = tolower(c);
+
+            if (clave == "ip.src")       return (ip_src == valor);
+            if (clave == "ip.dst")       return (ip_dst == valor);
+            if (clave == "mac.src")      return (mac_src == valor_lower);
+            if (clave == "mac.dst")      return (mac_dst == valor_lower);
+            if (clave == "tcp.srcport")  return (p_src == valor);
+            if (clave == "tcp.dstport")  return (p_dst == valor);
+            if (clave == "udp.srcport")  return (p_src == valor);
+            if (clave == "udp.dstport")  return (p_dst == valor);
+            if (clave == "tcp.port")     return (p_src == valor || p_dst == valor);
+            if (clave == "udp.port")     return (p_src == valor || p_dst == valor);
+            if (clave == "protocolo")    return (prot == valor_lower);
+            return false; // Clave no reconocida
+        }
+        else {
+            // --- Formato: solo protocolo ---
+            trim(cond);
+            return (prot == cond);
+        }
+        };
+
+    // --- Evaluar el filtro completo con AND y OR ---
     string filtro = filtro_aplicado;
     for (auto& c : filtro) c = tolower(c);
 
-    // Datos del paquete
-    string prot = paquetes_capturados[i].protocolo;
-    for (auto& c : prot) c = tolower(c);
-
-    string ip_src = paquetes_capturados[i].src_ip;
-    string ip_dst = paquetes_capturados[i].dest_ip;
-    string p_src = to_string(paquetes_capturados[i].src_port);
-    string p_dst = to_string(paquetes_capturados[i].dest_port);
-
-    // MAC en minúsculas (para comparar sin sensibilidad)
-    string mac_src = ip_src;
-    for (auto& c : mac_src) c = tolower(c);
-    string mac_dst = ip_dst;
-    for (auto& c : mac_dst) c = tolower(c);
-
-    // Buscar operador ==
-    size_t pos_eq = filtro.find("==");
-
-    if (pos_eq != string::npos) {
-        // --- Formato: clave == valor ---
-        string clave = filtro.substr(0, pos_eq);
-        string valor = filtro.substr(pos_eq + 2);
-
-        // Trim de clave y valor
-        auto trim = [](string& s) {
-            s.erase(0, s.find_first_not_of(" \t"));
-            s.erase(s.find_last_not_of(" \t") + 1);
-            };
-        trim(clave);
-        trim(valor);
-
-        // Valor en minúsculas para comparaciones de texto
-        string valor_lower = valor;
-        for (auto& c : valor_lower) c = tolower(c);
-
-        // --- IP fuente (coincidencia exacta) ---
-        if (clave == "ip.src") {
-            coincide = (ip_src == valor);
-            return;
+    // 1. Buscar " or " (partes unidas con OR)
+    vector<string> partes_or;
+    size_t pos_or = filtro.find(" or ");
+    if (pos_or != string::npos) {
+        // Dividir por " or "
+        size_t inicio = 0;
+        while (pos_or != string::npos) {
+            partes_or.push_back(filtro.substr(inicio, pos_or - inicio));
+            inicio = pos_or + 4; // " or " son 4 caracteres
+            pos_or = filtro.find(" or ", inicio);
         }
-
-        // --- IP destino (coincidencia exacta) ---
-        if (clave == "ip.dst") {
-            coincide = (ip_dst == valor);
-            return;
-        }
-
-        // --- MAC fuente (coincidencia exacta, sin sensibilidad a mayúsculas) ---
-        if (clave == "mac.src") {
-            coincide = (mac_src == valor_lower);
-            return;
-        }
-
-        // --- MAC destino ---
-        if (clave == "mac.dst") {
-            coincide = (mac_dst == valor_lower);
-            return;
-        }
-
-        // --- Puerto TCP origen ---
-        if (clave == "tcp.srcport") {
-            coincide = (p_src == valor);
-            return;
-        }
-
-        // --- Puerto TCP destino ---
-        if (clave == "tcp.dstport") {
-            coincide = (p_dst == valor);
-            return;
-        }
-
-        // --- Puerto UDP origen ---
-        if (clave == "udp.srcport") {
-            coincide = (p_src == valor);
-            return;
-        }
-
-        // --- Puerto UDP destino ---
-        if (clave == "udp.dstport") {
-            coincide = (p_dst == valor);
-            return;
-        }
-
-        // --- Puerto TCP (origen o destino) ---
-        if (clave == "tcp.port") {
-            coincide = (p_src == valor || p_dst == valor);
-            return;
-        }
-
-        // --- Puerto UDP (origen o destino) ---
-        if (clave == "udp.port") {
-            coincide = (p_src == valor || p_dst == valor);
-            return;
-        }
-
-        // --- Protocolo (estructurado) ---
-        if (clave == "protocolo") {
-            coincide = (prot == valor_lower);
-            return;
-        }
-
-        // Clave no reconocida
-        coincide = false;
-        return;
+        partes_or.push_back(filtro.substr(inicio));
     }
     else {
-        // --- Formato: solo nombre de protocolo ---
-        auto trim = [](string& s) {
-            s.erase(0, s.find_first_not_of(" \t"));
-            s.erase(s.find_last_not_of(" \t") + 1);
-            };
-        trim(filtro);
-
-        coincide = (prot == filtro);
-        return;
+        partes_or.push_back(filtro);
     }
+
+    // 2. Para cada parte del OR, evaluar ANDs internos
+    bool resultado_or = false;
+    for (const auto& parte_or : partes_or) {
+        // Buscar " and " dentro de esta parte
+        vector<string> partes_and;
+        size_t pos_and = parte_or.find(" and ");
+        if (pos_and != string::npos) {
+            size_t inicio = 0;
+            while (pos_and != string::npos) {
+                partes_and.push_back(parte_or.substr(inicio, pos_and - inicio));
+                inicio = pos_and + 5; // " and " son 5 caracteres
+                pos_and = parte_or.find(" and ", inicio);
+            }
+            partes_and.push_back(parte_or.substr(inicio));
+        }
+        else {
+            partes_and.push_back(parte_or);
+        }
+
+        // Todas las partes del AND deben ser verdaderas
+        bool resultado_and = true;
+        for (const auto& cond : partes_and) {
+            if (!evaluar_condicion(cond)) {
+                resultado_and = false;
+                break;
+            }
+        }
+
+        if (resultado_and) {
+            resultado_or = true;
+            break; // Con un OR verdadero, ya no necesitamos evaluar más
+        }
+    }
+
+    coincide = resultado_or;
 }
 
 
@@ -1095,6 +1092,34 @@ void mostrar_area_3() {
     ImGui::EndChild();
 }
 
+void mostrar_tooltip_de_filtro_analisis() {
+    ImGui::BeginTooltip();
+    ImGui::Text("Formatos aceptados:");
+    ImGui::Separator();
+    ImGui::Text("Solo protocolo:");
+    ImGui::BulletText("HTTP, DNS, TCP, UDP, ARP, SSH...");
+    ImGui::Separator();
+    ImGui::Text("Clave == valor:");
+    ImGui::BulletText("ip.src == 192.168.1.5");
+    ImGui::BulletText("ip.dst == 10.0.0.1");
+    ImGui::BulletText("mac.src == aa:bb:cc:dd:ee:ff");
+    ImGui::BulletText("mac.dst == 11:22:33:44:55:66");
+    ImGui::BulletText("tcp.srcport == 443");
+    ImGui::BulletText("tcp.dstport == 80");
+    ImGui::BulletText("udp.srcport == 53");
+    ImGui::BulletText("udp.dstport == 67");
+    ImGui::BulletText("tcp.port == 22");
+    ImGui::BulletText("udp.port == 53");
+    ImGui::BulletText("protocolo == TCP");
+    ImGui::Separator();
+    ImGui::Text("Operadores logicos:");
+    ImGui::BulletText("ip.src == 192.168.1.5 and tcp.port == 443");
+    ImGui::BulletText("HTTP or DNS");
+    ImGui::BulletText("tcp.port == 80 and ip.dst == 10.0.0.1");
+    ImGui::BulletText("ip.src == 192.168.1.5 or ip.src == 10.0.0.1");
+    ImGui::EndTooltip();
+}
+
 // @brief Dibuja la pantalla de análisis de tráfico, mostrando la lista de paquetes capturados y detalles del paquete seleccionado
 void mostrar_pantalla_analisis() {
 
@@ -1123,24 +1148,7 @@ void mostrar_pantalla_analisis() {
 
     // Tooltip de ayuda
     if (ImGui::IsItemHovered()) {
-        ImGui::BeginTooltip();
-        ImGui::Text("Formatos aceptados:");
-        ImGui::Separator();
-        ImGui::Text("Solo protocolo: HTTP, DNS, TCP, UDP, ARP, SSH...");
-        ImGui::Separator();
-        ImGui::Text("Clave == valor:");
-        ImGui::BulletText("ip.src == 192.168.1.5");
-        ImGui::BulletText("ip.dst == 10.0.0.1");
-        ImGui::BulletText("mac.src == aa:bb:cc:dd:ee:ff");
-        ImGui::BulletText("mac.dst == 11:22:33:44:55:66");
-        ImGui::BulletText("tcp.srcport == 443");
-        ImGui::BulletText("tcp.dstport == 80");
-        ImGui::BulletText("udp.srcport == 53");
-        ImGui::BulletText("udp.dstport == 67");
-        ImGui::BulletText("tcp.port == 22");
-        ImGui::BulletText("udp.port == 53");
-        ImGui::BulletText("protocolo == TCP");
-        ImGui::EndTooltip();
+        mostrar_tooltip_de_filtro_analisis();
     }
 
 	manejar_filtros_en_captura();
