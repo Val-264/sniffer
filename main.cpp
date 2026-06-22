@@ -38,7 +38,10 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
 
   // Mes, día, año , horas, minutos, segundos
   strftime(buffer_tiempo, sizeof(buffer_tiempo), "%m %d %Y  %H:%M:%S.", &info_tiempo);
-  record.tiempo_llegada = buffer_tiempo + to_string(pkthdr->ts.tv_sec);
+  // Convertir microsegundos con ancho fijo de 6 dígitos
+  stringstream ss_us;
+  ss_us << setfill('0') << setw(6) << microsegundos;
+  record.tiempo_llegada = buffer_tiempo + ss_us.str();
 
   // Tiempo de llegada en formato UTC
   tm info_tiempo_utc;
