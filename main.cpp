@@ -48,10 +48,10 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
   gmtime_s(&info_tiempo_utc, &segundos_totales); // gmtime_s calcula la hora cero global
   char buffer_utc[64];
   strftime(buffer_utc, sizeof(buffer_utc), "%b %d %Y %H:%M:%S", &info_tiempo_utc);
-  record.tiempo_llegada_utc = string(buffer_utc) + "." + to_string(microsegundos * 1000) + " UTC";
+  record.tiempo_llegada_utc = string(buffer_utc) + "." + ss_us.str() + " UTC";
 
   // Tiempo Epoch (Segundos.Microsegundos)
-  record.tiempo_epoch = to_string(segundos_totales) + "." + to_string(microsegundos * 1000);
+  record.tiempo_epoch = to_string(segundos_totales) + "." + ss_us.str();
 
 
   eth_header *eth_hdr = (struct eth_header *)packetd_ptr;
