@@ -176,20 +176,11 @@ void call_me(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packe
 }
 
 void captura_de_paquetes() {
- if (pcap_loop(capdev, 0, call_me, (u_char *)NULL) < 0) {
+ if (pcap_loop(capdev, 0, call_me, (u_char *)nullptr) < 0) {
         cerr << "ERR: pcap_loop() fallo: " << pcap_geterr(capdev) << "\n";
     }
 }
 
-string filtrar() {
-    string filtro;
-
-    cout << "Filtro: ";
-    cin.ignore();
-    getline(cin, filtro);
-
-    return filtro;
-}
 
 int main(int argc, char const *argv[]) {
     // Inicializar Winsock (Esencial en Windows)
@@ -200,7 +191,6 @@ int main(int argc, char const *argv[]) {
     }
 
     char error_buffer[PCAP_ERRBUF_SIZE];
-    int packets_count = 30; // Capturaremos 10 paquetes para la prueba inicial
     
     pcap_if_t *alldevs;
     pcap_if_t *device;
@@ -248,7 +238,7 @@ int main(int argc, char const *argv[]) {
 		return 1;
 	}
 
-	GLFWwindow* ventana = glfwCreateWindow(800, 600, "Sniffer de red", NULL, NULL);
+	GLFWwindow* ventana = glfwCreateWindow(800, 600, "Sniffer de red", nullptr, nullptr);
     if (!ventana) {
 		cerr << "Error al abir la ventana de GLFW.\n";
 		glfwTerminate();

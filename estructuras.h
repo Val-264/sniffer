@@ -200,8 +200,5 @@ extern atomic<bool> capturando;
 extern thread hilo_de_captura; // Hilo para la captura de paquetes
 extern mutex mutex_paquetes; // Mutex para proteger el acceso al vector de paquetes capturados en un entorno multihilo
 
-// Punteros globales para cambiar de fuente 
-static ImFont* fuente_interfaz = nullptr;
-static ImFont* fuente_hexadecimal = nullptr;
 
 #endif

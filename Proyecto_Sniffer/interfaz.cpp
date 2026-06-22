@@ -286,7 +286,7 @@ void mostrar_btn_detener() {
 limpiando la lista de paquetes capturados para empezar una nueva sesión de captura sin tener 
 que volver a la pantalla de selección de interfaz
 */
-void reinciar_Captura() {
+void reiniciar_Captura() {
     if (ImGui::Button("Reiniciar captura")) {
         if (!capturando) {
             if (abrir_y_configurar_interfaz()) {
@@ -352,7 +352,7 @@ void manejar_exportacion() {
         // Contendio de la ventana emergente 
         if (!exportacion_seleccionada) {
             ImGui::OpenPopup("Configurar exportacion");
-            if (ImGui::BeginPopupModal("Configurar exportacion", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            if (ImGui::BeginPopupModal("Configurar exportacion", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
 
                 if (ImGui::Selectable(">> Contenido por default")) {
                     contenido_por_default = true;
@@ -393,7 +393,7 @@ void manejar_exportacion() {
 
         if (personalizar) {
             ImGui::OpenPopup("Personalizar");
-            if (ImGui::BeginPopupModal("Personalizar", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            if (ImGui::BeginPopupModal("Personalizar", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
                 ImGui::Checkbox("No.", &no_columna); ImGui::Spacing();
                 ImGui::Checkbox("Protocolo", &protocolo_columna); ImGui::Spacing();
                 ImGui::Checkbox("Origen (IP/MAC)", &origen_columna); ImGui::Spacing();
@@ -553,7 +553,7 @@ void manejar_exportacion() {
                 }
                 else {
                     ImGui::OpenPopup("Fallo al exportar");
-                    if (ImGui::BeginPopupModal("Fallo al exportar", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+                    if (ImGui::BeginPopupModal("Fallo al exportar", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
                         ImGui::TextUnformatted("No se pudo crear el archivo CSV");
                         ImGui::Spacing();
                         if (ImGui::Button("OK", ImVec2(80.0f, 30.0f))) {
@@ -581,7 +581,7 @@ void manejar_exportacion() {
     if (nombre_csv_vacio) {
         // Si el usuario no ingresa un nombre de archivo, se muestra un error y no se procede con la exportación
         ImGui::OpenPopup("Nombre de archivo requerido");
-        if (ImGui::BeginPopupModal("Nombre de archivo requerido", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (ImGui::BeginPopupModal("Nombre de archivo requerido", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::TextUnformatted("Por favor ingresa un nombre para el archivo CSV.");
             ImGui::Spacing();
             if (ImGui::Button("OK", ImVec2(80.0f, 30.0f))) {
@@ -595,7 +595,7 @@ void manejar_exportacion() {
 
     if (exportacion_exitosa) {
         ImGui::OpenPopup("Exportacion Exitosa");
-        if (ImGui::BeginPopupModal("Exportacion Exitosa", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (ImGui::BeginPopupModal("Exportacion Exitosa", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::TextUnformatted("Trafico exportado exitosamente al CSV");
             ImGui::Spacing();
             if (ImGui::Button("OK", ImVec2(80.0f, 30.0f))) {
@@ -926,7 +926,7 @@ void mostrar_pantalla_analisis() {
 
 
     ImGui::SameLine();
-	reinciar_Captura();
+	reiniciar_Captura();
 
     ImGui::SameLine();
     ImGui::Text(" | Filtro:"); ImGui::SameLine();
