@@ -111,6 +111,46 @@ bool abrir_y_configurar_interfaz() {
 // =======================================================================================================================================
 //                                                      PANTALLA 1: SELECCIÓN DE INTERFAZ 
 // =======================================================================================================================================
+
+void mostrar_tooltip_filtro_bpf() {
+    ImGui::BeginTooltip();
+    ImGui::Text("Filtro de captura Berkeley Packet Filter (BPF)");
+    ImGui::Separator();
+    ImGui::Text("Sintaxis:");
+    ImGui::Separator();
+    ImGui::Text("Por protocolo:");
+    ImGui::BulletText("tcp");
+    ImGui::BulletText("udp");
+    ImGui::BulletText("icmp");
+    ImGui::BulletText("arp");
+    ImGui::Separator();
+    ImGui::Text("Por puerto:");
+    ImGui::BulletText("port 80");
+    ImGui::BulletText("tcp port 443");
+    ImGui::BulletText("udp port 53");
+    ImGui::BulletText("portrange 1-1024");
+    ImGui::Separator();
+    ImGui::Text("Por direccion:");
+    ImGui::BulletText("host 192.168.1.1");
+    ImGui::BulletText("src host 10.0.0.5");
+    ImGui::BulletText("dst host 8.8.8.8");
+    ImGui::BulletText("net 192.168.1.0/24");
+    ImGui::Separator();
+    ImGui::Text("Por MAC:");
+    ImGui::BulletText("ether host aa:bb:cc:dd:ee:ff");
+    ImGui::BulletText("ether src 11:22:33:44:55:66");
+    ImGui::Separator();
+    ImGui::Text("Combinaciones:");
+    ImGui::BulletText("tcp and port 80");
+    ImGui::BulletText("udp or tcp");
+    ImGui::BulletText("not arp");
+    ImGui::BulletText("src host 192.168.1.1 and tcp");
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.3f, 1.0f), "Se aplica antes de capturar.");
+    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.3f, 1.0f), "Solo se capturan los paquetes que coinciden.");
+    ImGui::EndTooltip();
+}
+
 // @brief Dibuja la pantalla de selección de interfaz, permitiendo al usuario elegir una interfaz de red para iniciar la captura de paquetes
 void mostrar_pantalla_interfaz() {
 
@@ -130,6 +170,10 @@ void mostrar_pantalla_interfaz() {
     ImGui::SetNextItemWidth(ancho_input);
     ImGui::InputText("##FiltroBPF", filtro_antes_captura, IM_ARRAYSIZE(filtro_antes_captura));
     ImGui::Spacing();
+    // Tooltip de ayuda para filtro BPF
+    if (ImGui::IsItemHovered()) {
+		mostrar_tooltip_filtro_bpf();
+    }
 
     ImGui::Text("Interfaces disponibles:");
     ImGui::SetNextItemWidth(500);
