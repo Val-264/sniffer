@@ -1,6 +1,7 @@
 // Control de la interfaz gráfica 
 
 #include "estructuras.h"
+using namespace std;
 
 static bool vista_analisis = false; // Bandera para controlar lo que se analiza en pantalla 
 static int interfaz_seleccionada = 0;
@@ -65,12 +66,16 @@ void establecer_estilo_general() {
 void cambiar_tema_obscuro() {
 	if (ImGui::Button("Tema obscuro")) {
 		ImGui::StyleColorsDark();
+        tema_claro = false;
+		tema_obscuro = true;
 	}
 }
 
 void cambiar_tema_claro() {
     if (ImGui::Button("Tema claro")) {
         ImGui::StyleColorsLight();
+        tema_claro = true;
+        tema_obscuro = false;
     }
 }
 
@@ -271,6 +276,7 @@ activa y permitiendo al usuario analizar el tráfico capturado hasta el momento 
 sesión de análisis de tráfico ni volver a la pantalla de selección de interfaz
 */ 
 void mostrar_btn_detener() {
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.8f, 0.0f, 0.0f, 1.0f));
     if (ImGui::Button("Detener")) {
         if (capturando) {
             capturando = false;
@@ -279,6 +285,7 @@ void mostrar_btn_detener() {
             if (capdev != nullptr) { pcap_close(capdev); capdev = nullptr; }
         }
     }
+    ImGui::PopStyleColor();
 }
 
 /*
@@ -611,6 +618,35 @@ void manejar_exportacion() {
     }
 }
 
+// @brief Devuelve un color específico para cada protocolo, utilizado para colorear las filas de la tabla 
+// de análisis de tráfico y mejorar la visualización del tráfico capturado, aplicando una transparencia para 
+// que los colores no sean demasiado intensos y permitan distinguir fácilmente los diferentes protocolos en la tabla
+ImVec4 obtener_color_protocolo(const std::string& protocolo) {
+    // Transparencia
+    float alpha = (tema_obscuro) ? 0.50f : 0.25f; 
+
+    if (protocolo == "HTTP" || protocolo == "HTTPS")
+        return ImVec4(0.20f, 0.55f, 0.95f, 0.25f); // Azul suave
+    else if (protocolo == "DNS")
+        return ImVec4(0.95f, 0.75f, 0.15f, 0.25f); // Ámbar suave
+    else if (protocolo == "TCP")
+        return ImVec4(0.30f, 0.70f, 0.45f, 0.25f); // Verde suave
+    else if (protocolo == "UDP")
+        return ImVec4(0.60f, 0.50f, 0.85f, 0.25f); // Violeta suave
+    else if (protocolo == "ICMPv4" || protocolo == "ICMPv6")
+        return ImVec4(0.95f, 0.45f, 0.25f, 0.25f); // Naranja suave
+    else if (protocolo == "ARP")
+        return ImVec4(0.65f, 0.65f, 0.65f, 0.25f); // Gris medio
+    else if (protocolo == "SSH")
+        return ImVec4(0.25f, 0.75f, 0.80f, 0.25f); // Cian suave
+    else if (protocolo == "DHCP")
+        return ImVec4(0.80f, 0.40f, 0.70f, 0.25f); // Rosa suave
+    else if (protocolo == "FTP" || protocolo == "Telnet")
+        return ImVec4(0.70f, 0.55f, 0.35f, 0.25f); // Marrón suave
+    else
+        return ImVec4(0.40f, 0.40f, 0.40f, 0.15f); // Gris neutro para otros
+}
+
 // @brief Dibuja el área de la tabla que muestra el tráfico capturado, aplicando el filtro de captura 
 // si está activo para mostrar solo los paquetes que coincidan con el filtro aplicado, y permitiendo 
 // al usuario seleccionar un paquete para mostrar su información detallada en el área de información estructurada
@@ -647,6 +683,10 @@ void mostrar_area_1(float ancho_total, float alto_total) {
                 if (!coincide) continue;
 
                 ImGui::TableNextRow();
+
+				// Asiganar color según el protocolo para mejorar la visualización del tráfico en la tabla
+                ImVec4 color_fila = obtener_color_protocolo(paquetes_capturados[i].protocolo);
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::ColorConvertFloat4ToU32(color_fila));
 
                 ImGui::PushID(i); // Usar el índice como ID para evitar conflictos en la tabla
 
@@ -854,6 +894,7 @@ void mostrar_area_3() {
                     // Dibujar el bloque resaltador azul 
                     if (byte_resaltado == (int)(i + j)) {
                         draw_list->AddRectFilled(pos_min, pos_max, IM_COL32(0, 130, 255, 100));
+						draw_list->AddRectFilled(pos_min, pos_max, IM_COL32(255, 255, 255, 255));
                     }
                 }
                 else {
@@ -869,7 +910,8 @@ void mostrar_area_3() {
             // --- COLUMNA ASCII ---
             ImGui::SetCursorPosX(offset_ascii);
 
-            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 255, 255)); // Color azul cian para el texto ASCII
+            if (tema_obscuro) ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 255, 255)); // Color azul cian para el texto ASCII
+			if (tema_claro) ImGui::PushStyleColor(ImGuiCol_Text, (IM_COL32(0, 140, 0, 255))); // Color azul para el texto ASCII
             for (size_t j = 0; j < 16; j++) {
                 if (i + j < paquete_actual.raw_data.size()) {
                     unsigned char byte = paquete_actual.raw_data[i + j];
@@ -887,12 +929,13 @@ void mostrar_area_3() {
 
                     // Aplicar el mismo bloque resaltador azul a la letra
                     if (byte_resaltado == (int)(i + j)) {
-                        draw_list->AddRectFilled(pos_min, pos_max, IM_COL32(0, 130, 255, 100));
+                        draw_list->AddRectFilled(pos_min, pos_max, IM_COL32(0, 130, 255, 100));            
                     }
                 }
                 ImGui::SameLine(0, 0);
             }
-            ImGui::PopStyleColor();
+            if (tema_obscuro) ImGui::PopStyleColor();
+			if (tema_claro)   ImGui::PopStyleColor();
             ImGui::NewLine();
         }
 

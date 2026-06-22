@@ -1,6 +1,8 @@
 // Control general del sniffer y almacenamiento y captura de paquetes en un vector global para mostrarlos en la interfaz gráfica
 
 #include "estructuras.h"
+using namespace std;
+
 // Inicializar variables globales 
 // Almacenamiento global de paquetes capturados
 vector<Datos_Paquete> paquetes_capturados;
@@ -182,6 +184,9 @@ void captura_de_paquetes() {
 }
 
 
+bool tema_obscuro = true;
+bool tema_claro = false;
+
 int main(int argc, char const *argv[]) {
     // Inicializar Winsock (Esencial en Windows)
     WSADATA wsaData;
@@ -254,6 +259,7 @@ int main(int argc, char const *argv[]) {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     ImGui::StyleColorsDark();
+
 
     ImGui_ImplGlfw_InitForOpenGL(ventana, true);
     ImGui_ImplOpenGL3_Init("#version 130");

@@ -24,34 +24,32 @@
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
 
-using namespace std;
-
 void dibujarInterfaz();
 void captura_de_paquetes();
 
 // Estructuras para almacenar información de interfaces de red y paquetes capturados
 struct InterfacesDeRed{
-    string nombre_tecnico;
-	string descripcion;
+    std::string nombre_tecnico;
+    std::string descripcion;
 };
 
 struct Datos_Paquete {
   int id; 
   int longitud_paquete;
-  string src_ip;        // IP de origen (o MAC para ARP)
-  string dest_ip;       // IP de destino (o MAC para ARP)
-  string protocolo; 
+  std::string src_ip;        // IP de origen (o MAC para ARP)
+  std::string dest_ip;       // IP de destino (o MAC para ARP)
+  std::string protocolo;
 
   int src_port = 0;     // Puerto de origen (si aplica)
   int dest_port = 0;    // Puerto de destino (si aplica)
 
-  string extra_info;
+  std::string extra_info;
 
-  string tiempo_llegada;
-  string tiempo_llegada_utc; // Tiempo de llegada en formato UTC
-  string tiempo_epoch; // Tiempo de llegada en formato epoch (segundos desde 1970)
+  std::string tiempo_llegada;
+  std::string tiempo_llegada_utc; // Tiempo de llegada en formato UTC
+  std::string tiempo_epoch; // Tiempo de llegada en formato epoch (segundos desde 1970)
 
-  vector<unsigned char> raw_data;
+  std::vector<unsigned char> raw_data;
 };
 
 
@@ -190,15 +188,17 @@ struct dhcp_header {
 // VARIABLES GLOBALES 
 // ==========================================
 // Almacenamiento global de paquetes capturados
-extern vector<Datos_Paquete> paquetes_capturados;
+extern std::vector<Datos_Paquete> paquetes_capturados;
 extern int id_paquete;
 extern int longitud_encabezado_de_red;  // Longitud de los datos de la capa de enlace 
-extern vector<InterfacesDeRed> lista_interfaces_de_red; // Almacenamiento global de interfaces de red disponibles
+extern std::vector<InterfacesDeRed> lista_interfaces_de_red; // Almacenamiento global de interfaces de red disponibles
 
 extern pcap_t* capdev;
-extern atomic<bool> capturando;
-extern thread hilo_de_captura; // Hilo para la captura de paquetes
-extern mutex mutex_paquetes; // Mutex para proteger el acceso al vector de paquetes capturados en un entorno multihilo
+extern std::atomic<bool> capturando;
+extern std::thread hilo_de_captura; // Hilo para la captura de paquetes
+extern std::mutex mutex_paquetes; // Mutex para proteger el acceso al vector de paquetes capturados en un entorno multihilo
 
+extern bool tema_obscuro;
+extern bool tema_claro;
 
 #endif
