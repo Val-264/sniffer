@@ -585,6 +585,9 @@ void manejar_exportacion() {
     static char carpeta_exportacion[500] = "";
     static char ruta_personalizada[MAX_PATH] = "";
     static bool usar_ruta_personalizada = false;
+    string ruta_elegida;
+    string ruta_completa;
+    static string texto_final;
 
     if (ImGui::Button("Exportar")) {
         if (!capturando) {
@@ -735,15 +738,15 @@ void manejar_exportacion() {
                 if (!fs::exists(carpeta_exportacion)) {
                     fs::create_directories(carpeta_exportacion);
                 }
-                string ruta_completa = string(carpeta_exportacion) + nombre_archivo + ".csv";
+                ruta_completa = string(carpeta_exportacion) + nombre_archivo + ".csv";
                 ofstream archivo(ruta_completa);
                 if (archivo.is_open()) {
+                    texto_final = "Trafico exportado exitosamente al CSV\nArchivo creado en: " + (string)ruta_completa;
                     exportar = false;
                     escribir_csv(archivo);
                     archivo.close();
                     nombre_archivo[0] = '\0';
                     exportacion_exitosa = true;
-                    cout << "Exportacion exitosa. Archivo creado en: " << ruta_completa << "\n";
                 }
                 else {
                     ImGui::CloseCurrentPopup();
@@ -757,7 +760,7 @@ void manejar_exportacion() {
 
             if (ImGui::Button("Elegir ubicacion personalizada...", ImVec2(350, 30))) {
                 string nombre_sugerido = string(nombre_archivo) + ".csv";
-                string ruta_elegida = abrir_dialogo_guardar(nombre_sugerido);
+                ruta_elegida = abrir_dialogo_guardar(nombre_sugerido);
                 if (!ruta_elegida.empty()) {
                     strcpy_s(ruta_personalizada, ruta_elegida.c_str());
                     usar_ruta_personalizada = true;
@@ -765,6 +768,7 @@ void manejar_exportacion() {
 
                     ofstream archivo(ruta_personalizada);
                     if (archivo.is_open()) {
+                        texto_final = "Trafico exportado exitosamente al CSV\nArchivo creado en :" + (string)ruta_personalizada;
                         exportar = false;
                         escribir_csv(archivo);
                         archivo.close();
@@ -772,7 +776,6 @@ void manejar_exportacion() {
                         ruta_personalizada[0] = '\0';
                         usar_ruta_personalizada = false;
                         exportacion_exitosa = true;
-                        cout << "Exportacion exitosa. Archivo creado en: " << ruta_elegida << "\n";
                     }
                     else {
                         ImGui::CloseCurrentPopup();
@@ -815,7 +818,7 @@ void manejar_exportacion() {
     if (exportacion_exitosa) {
         ImGui::OpenPopup("Exportacion Exitosa");
         if (ImGui::BeginPopupModal("Exportacion Exitosa", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextUnformatted("Trafico exportado exitosamente al CSV");
+            ImGui::TextUnformatted(texto_final.c_str());
             ImGui::Spacing();
             if (ImGui::Button("OK", ImVec2(80.0f, 30.0f))) {
                 limpiar_banderas_exportacion();
