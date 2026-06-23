@@ -1,5 +1,4 @@
 
-// @TODO que el usuario pueda elegir la ruta específica para guardar la exportacion 
 // @TODO mejoras en la interfaz de la interfaz 
 
 // Control de la interfaz gráfica 
@@ -158,64 +157,115 @@ void mostrar_tooltip_filtro_bpf() {
 // @brief Dibuja la pantalla de selección de interfaz, permitiendo al usuario elegir una interfaz de red para iniciar la captura de paquetes
 void mostrar_pantalla_interfaz() {
 
-	cambiar_tema_obscuro();
-	ImGui::SameLine();
+    // Detectar colores del tema actual
+    ImVec4 color_texto = ImGui::GetStyle().Colors[ImGuiCol_Text];
+    ImVec4 color_acento = ImVec4(0.20f, 0.50f, 0.95f, 1.0f);  // Azul medio
+    ImVec4 color_advertencia = ImVec4(0.90f, 0.55f, 0.05f, 1.0f); // Naranja/ámbar oscuro
+    ImVec4 color_exito = ImVec4(0.10f, 0.70f, 0.20f, 1.0f);   // Verde medio intenso
+    ImVec4 color_error = ImVec4(0.85f, 0.20f, 0.20f, 1.0f);   // Rojo medio intenso
+
+    // --- Barra de herramientas superior ---
+    cambiar_tema_obscuro();
+    ImGui::SameLine();
     cambiar_tema_claro();
     ImGui::Separator();
 
-    ImGui::Text("BIENVENIDO AL ANALIZADOR DE TRAFICO\n\nSELECCIONA UNA INTERFAZ PARA COMENZAR\n");
+    // --- Título centrado ---
+    ImGui::Spacing();
+    float ancho_ventana = ImGui::GetContentRegionAvail().x;
+
+    string titulo = "ANALIZADOR DE TRAFICO DE RED";
+    ImGui::SetCursorPosX((ancho_ventana - ImGui::CalcTextSize(titulo.c_str()).x) * 0.5f);
+    ImGui::TextColored(color_acento, "%s", titulo.c_str());
+
+    ImGui::Spacing();
+    string subtitulo = "Selecciona una interfaz para comenzar la captura";
+    ImGui::SetCursorPosX((ancho_ventana - ImGui::CalcTextSize(subtitulo.c_str()).x) * 0.5f);
+    ImGui::Text("%s", subtitulo.c_str());
+    ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
 
-    // Filtro de captura bpf opcional para que el usuario pueda escribir un filtro antes de iniciar la captura 
-    ImGui::Text("Filtro (Puedes configurar un filtro antes de comenzar la captura):");
+    // --- Sección de filtro BPF ---
+    ImGui::TextColored(color_advertencia, "Filtro de captura (opcional):");
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+
     float ancho_input = ImGui::GetContentRegionAvail().x * 0.8f;
-    if (ancho_input < 200.0f) ancho_input = 200.0f; // mínimo
+    if (ancho_input < 200.0f) ancho_input = 200.0f;
     ImGui::SetNextItemWidth(ancho_input);
-    ImGui::InputText("##FiltroBPF", filtro_antes_captura, IM_ARRAYSIZE(filtro_antes_captura));
-    ImGui::Spacing();
-    // Tooltip de ayuda para filtro BPF
+    ImGui::InputTextWithHint("##FiltroBPF", "Ej: tcp port 80 or udp port 53",
+        filtro_antes_captura, IM_ARRAYSIZE(filtro_antes_captura));
     if (ImGui::IsItemHovered()) {
-		mostrar_tooltip_filtro_bpf();
+        mostrar_tooltip_filtro_bpf();
     }
 
-    ImGui::Text("Interfaces disponibles:");
-    ImGui::SetNextItemWidth(500);
+    if (strlen(filtro_antes_captura) > 0) {
+        ImGui::SameLine();
+        ImGui::TextColored(color_exito, "Filtro activo");
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // --- Sección de interfaces ---
+    ImGui::TextColored(color_advertencia, "Interfaces de red disponibles:");
+    ImGui::Spacing();
 
     if (!lista_interfaces_de_red.empty()) {
-        string preview_actual = lista_interfaces_de_red[interfaz_seleccionada].descripcion;
         bool hay_seleccion = false;
-        // Estandatizar el tamaño de los botones para que se vean uniformes
+
+        // Preparar estilo de botones
         float ancho_boton = ImGui::GetContentRegionAvail().x * 0.85f;
-        if (ancho_boton > 500.0f) ancho_boton = 500.0f; // máximo
-        ImVec2 tamanio_boton = ImVec2(ancho_boton, 30.0f);
-		// Alinear el texto de los botones hacia la izquierda y agregar padding para mejorar la apariencia
+        if (ancho_boton > 550.0f) ancho_boton = 550.0f;
+        ImVec2 tamanio_boton = ImVec2(ancho_boton, 35.0f);
+
         ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 6.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 8.0f));
+
         for (int i = 0; i < lista_interfaces_de_red.size(); i++) {
-            if (ImGui::Button(lista_interfaces_de_red[i].descripcion.c_str(), tamanio_boton)) {
+            // Mostrar número de interfaz
+            string etiqueta = to_string(i + 1) + ". " + lista_interfaces_de_red[i].descripcion;
+
+            if (ImGui::Button(etiqueta.c_str(), tamanio_boton)) {
                 interfaz_seleccionada = i;
-                hay_seleccion = true;      
+                hay_seleccion = true;
+            }
+
+            // Tooltip con información técnica
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("Nombre tecnico: %s", lista_interfaces_de_red[i].nombre_tecnico.c_str());
+                ImGui::Text("Descripcion: %s", lista_interfaces_de_red[i].descripcion.c_str());
+                ImGui::Text("Haz clic para seleccionar esta interfaz");
+                ImGui::EndTooltip();
             }
             ImGui::Spacing();
         }
 
-		ImGui::PopStyleVar(2); // ButtonTextAlign
+        ImGui::PopStyleVar(2);
 
         if (hay_seleccion) {
-			if (abrir_y_configurar_interfaz()) {
+            if (abrir_y_configurar_interfaz()) {
                 capturando = true;
                 vista_analisis = true; // Cambiar la vista a análisis de tráfico
                 hilo_de_captura = thread(captura_de_paquetes);
-			}
-
+            }
         }
 
         ImGui::Spacing();
 
     }
     else {
-        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "No se encontraron interfaces activas.");
+        ImGui::Spacing();
+        string mensaje_error = "No se encontraron interfaces activas.";
+        ImGui::SetCursorPosX((ancho_ventana - ImGui::CalcTextSize(mensaje_error.c_str()).x) * 0.5f);
+        ImGui::TextColored(color_error, "%s", mensaje_error.c_str());
+        ImGui::Spacing();
+        string sugerencia = "Ejecuta como Administrador para ver todas las interfaces";
+        ImGui::SetCursorPosX((ancho_ventana - ImGui::CalcTextSize(sugerencia.c_str()).x) * 0.5f);
+        ImGui::TextDisabled("%s", sugerencia.c_str());
     }
 }
 
