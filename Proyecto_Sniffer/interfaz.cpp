@@ -1,6 +1,4 @@
 
-// @TODO mejoras en la interfaz de la interfaz 
-
 // Control de la interfaz gráfica 
 
 #include "estructuras.h"
